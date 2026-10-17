@@ -1,0 +1,14 @@
+# Baseline 2D CNN trained from scratch.
+# Input [3, 256, 256] with channels PRE, EARLY, LATE (early fusion of the DCE phases).
+# Each stage: `convs` x (conv kernel_size x kernel_size, no bias -> BatchNorm -> activation),
+# followed by 2x2 max pooling. Head: global average pooling -> dropout -> linear -> 1 logit.
+in_channels: 3
+kernel_size: 3
+activation: relu  # relu | leaky_relu | elu | gelu
+stages:
+  - {channels: 8, convs: 2}
+  - {channels: 16, convs: 2}
+  - {channels: 32, convs: 2}
+  - {channels: 64, convs: 2}
+  - {channels: 128, convs: 2}
+dropout: 0.3

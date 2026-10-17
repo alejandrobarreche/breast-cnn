@@ -160,6 +160,12 @@ python scripts/explore_train.py                     # EDA de train -> artifacts/
 
 El notebook `notebooks/01_eda.ipynb` presenta el análisis exploratorio.
 
+Arquitectura:
+
+```bash
+python scripts/describe_model.py configs/model/baseline.yaml   # tabla de capas y parámetros
+```
+
 Tests y estilo:
 
 ```bash
