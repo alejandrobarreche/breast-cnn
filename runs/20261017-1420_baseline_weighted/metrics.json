@@ -1,0 +1,167 @@
+{
+  "experiment": "baseline_weighted",
+  "scope": "internal_validation_folds",
+  "aggregation": "mean_probability_per_patient",
+  "selection": "best_validation_patient_auc",
+  "summary": {
+    "slice_auc": {
+      "mean": 0.566290769268074,
+      "std": 0.03299499329033216
+    },
+    "slice_sensitivity": {
+      "mean": 0.5491018482329627,
+      "std": 0.28418458721289125
+    },
+    "slice_specificity": {
+      "mean": 0.5348771469427279,
+      "std": 0.31198789702438334
+    },
+    "slice_balanced_accuracy": {
+      "mean": 0.5419894975878453,
+      "std": 0.029682343959167266
+    },
+    "patient_auc": {
+      "mean": 0.5700631777953293,
+      "std": 0.03716422819650395
+    },
+    "patient_sensitivity": {
+      "mean": 0.541896505376344,
+      "std": 0.2913473681034586
+    },
+    "patient_specificity": {
+      "mean": 0.5411955163044854,
+      "std": 0.3173743170560953
+    },
+    "patient_balanced_accuracy": {
+      "mean": 0.5415460108404148,
+      "std": 0.027016874689070505
+    }
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "best_epoch": 4,
+      "epochs_run": 12,
+      "pos_weight": 2.4002329192546585,
+      "training_slices": 8759,
+      "training_patients": 878,
+      "threshold": 0.5,
+      "slice": {
+        "n": 2186,
+        "positives": 640,
+        "auc": 0.5564743693402328,
+        "sensitivity": 0.3703125,
+        "specificity": 0.7626131953428201,
+        "balanced_accuracy": 0.5664628476714101
+      },
+      "patient": {
+        "n": 219,
+        "positives": 64,
+        "auc": 0.5561491935483871,
+        "sensitivity": 0.359375,
+        "specificity": 0.7806451612903226,
+        "balanced_accuracy": 0.5700100806451613
+      }
+    },
+    {
+      "fold": 1,
+      "best_epoch": 1,
+      "epochs_run": 9,
+      "pos_weight": 2.3724961479198767,
+      "training_slices": 8755,
+      "training_patients": 878,
+      "threshold": 0.5,
+      "slice": {
+        "n": 2190,
+        "positives": 620,
+        "auc": 0.5897729607561126,
+        "sensitivity": 0.6193548387096774,
+        "specificity": 0.4821656050955414,
+        "balanced_accuracy": 0.5507602219026094
+      },
+      "patient": {
+        "n": 219,
+        "positives": 62,
+        "auc": 0.5974933223751798,
+        "sensitivity": 0.6290322580645161,
+        "specificity": 0.47770700636942676,
+        "balanced_accuracy": 0.5533696322169714
+      }
+    },
+    {
+      "fold": 2,
+      "best_epoch": 3,
+      "epochs_run": 11,
+      "pos_weight": 2.3281368821292774,
+      "training_slices": 8753,
+      "training_patients": 877,
+      "threshold": 0.5,
+      "slice": {
+        "n": 2192,
+        "positives": 586,
+        "auc": 0.575185205649463,
+        "sensitivity": 0.9982935153583617,
+        "specificity": 0.0161892901618929,
+        "balanced_accuracy": 0.5072414027601273
+      },
+      "patient": {
+        "n": 220,
+        "positives": 59,
+        "auc": 0.5797452363406674,
+        "sensitivity": 1.0,
+        "specificity": 0.018633540372670808,
+        "balanced_accuracy": 0.5093167701863354
+      }
+    },
+    {
+      "fold": 3,
+      "best_epoch": 2,
+      "epochs_run": 10,
+      "pos_weight": 2.5494728304947283,
+      "training_slices": 8753,
+      "training_patients": 877,
+      "threshold": 0.5,
+      "slice": {
+        "n": 2192,
+        "positives": 750,
+        "auc": 0.5139417475728155,
+        "sensitivity": 0.264,
+        "specificity": 0.7642163661581137,
+        "balanced_accuracy": 0.5141081830790568
+      },
+      "patient": {
+        "n": 220,
+        "positives": 75,
+        "auc": 0.512551724137931,
+        "sensitivity": 0.25333333333333335,
+        "specificity": 0.7793103448275862,
+        "balanced_accuracy": 0.5163218390804598
+      }
+    },
+    {
+      "fold": 4,
+      "best_epoch": 14,
+      "epochs_run": 22,
+      "pos_weight": 2.37442218798151,
+      "training_slices": 8760,
+      "training_patients": 878,
+      "threshold": 0.5,
+      "slice": {
+        "n": 2185,
+        "positives": 620,
+        "auc": 0.5960795630217459,
+        "sensitivity": 0.4935483870967742,
+        "specificity": 0.6492012779552716,
+        "balanced_accuracy": 0.5713748325260228
+      },
+      "patient": {
+        "n": 219,
+        "positives": 62,
+        "auc": 0.6043764125744812,
+        "sensitivity": 0.46774193548387094,
+        "specificity": 0.6496815286624203,
+        "balanced_accuracy": 0.5587117320731456
+      }
+    }
+  ]
+}
