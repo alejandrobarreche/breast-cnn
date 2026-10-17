@@ -176,6 +176,12 @@ python scripts/train.py +experiment=regularized   # tasa de aprendizaje 3e-4, de
 python scripts/train.py +experiment=separable     # convoluciones separables en profundidad
 ```
 
+Cada época imprime la pérdida y el AUC por paciente de train y validación. Si un entrenamiento se interrumpe, se continúa desde la última época completada:
+
+```bash
+python scripts/train.py --resume runs/<id>
+```
+
 Tests y estilo:
 
 ```bash

@@ -142,7 +142,7 @@ Hay dos máquinas con funciones separadas. Claude identifica en cuál está por 
 - Windows no edita código, configs ni documentación. Si algo falla y requiere cambiar código, se detiene, se describe el error y se corrige en el Mac.
 - El Mac no edita nada dentro de `runs/`.
 - `git pull --rebase` antes de empezar a trabajar y antes de cada push, en ambas máquinas.
-- Cada run tiene una carpeta propia e irrepetible: `runs/<AAAAMMDD-HHMM>_<experimento>/`. Un run existente nunca se reescribe.
+- Cada run tiene una carpeta propia e irrepetible: `runs/<AAAAMMDD-HHMM>_<experimento>/`. Un run terminado (con `metrics.json`) nunca se reescribe; uno interrumpido se continúa con `--resume`, solo con el mismo commit.
 - `.gitattributes` fija finales de línea LF para que Windows no marque ficheros como modificados; `metadata/` queda excluido porque es inmutable.
 
 ### Contenido de un run
@@ -151,11 +151,12 @@ Hay dos máquinas con funciones separadas. Claude identifica en cuál está por 
 runs/<AAAAMMDD-HHMM>_<experimento>/
 ├── config.yaml                 configuración resuelta usada (datos, entrenamiento, arquitectura)
 ├── environment.json            commit, dispositivo, GPU, versiones, tiempos, memoria máxima
-├── history.csv                 métricas por fold y época
+├── history.csv                 pérdida y AUC por paciente de train y validación, por fold y época
 ├── metrics.json                métricas de la mejor época por fold (corte y paciente) y media ± desviación
 ├── predictions_validation.csv  probabilidad por corte de la validación interna, para el análisis en el Mac
 ├── figures/                    curvas de aprendizaje
-└── model_fold<k>.pt            pesos de la mejor época de cada fold (fuera de Git)
+├── model_fold<k>.pt            pesos de la mejor época de cada fold (fuera de Git)
+└── checkpoint_fold<k>.pt       estado completo tras la última época, para --resume (fuera de Git)
 ```
 
 ## 13. Git

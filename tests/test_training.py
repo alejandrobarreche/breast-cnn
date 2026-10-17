@@ -9,7 +9,13 @@ import pytest
 from PIL import Image
 
 from breast_cnn.configuration import DataConfig, TrainConfig, load_train_config
-from breast_cnn.training import aggregate_patients, binary_metrics, run_experiment
+from breast_cnn.training import (
+    aggregate_patients,
+    binary_metrics,
+    loop,
+    resume_experiment,
+    run_experiment,
+)
 from breast_cnn.training.loop import positive_class_weight
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,13 +94,13 @@ def training_project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_run_experiment_writes_complete_run(training_project: Path) -> None:
+def smoke_config(**changes: object) -> tuple[DataConfig, TrainConfig]:
     data = DataConfig(
         metadata_dir="metadata",
         image_path_aliases={"dataset": "data"},
         expected_image_size=[256, 256],
     )
-    config = TrainConfig(
+    config = dict(
         experiment="smoke",
         model="configs/model/tiny.yaml",
         folds=[0, 3],
@@ -114,6 +120,11 @@ def test_run_experiment_writes_complete_run(training_project: Path) -> None:
         threshold=0.5,
         runs_dir="runs",
     )
+    return data, TrainConfig(**(config | changes))
+
+
+def test_run_experiment_writes_complete_run(training_project: Path) -> None:
+    data, config = smoke_config()
     run_dir = run_experiment(training_project, data, config)
 
     assert run_dir.parent == training_project / "runs"
@@ -143,6 +154,42 @@ def test_run_experiment_writes_complete_run(training_project: Path) -> None:
     history = pd.read_csv(run_dir / "history.csv")
     assert set(history["fold"]) == {0, 3}
     assert history["train_loss"].notna().all()
+    assert history["train_patient_auc"].between(0, 1).all()
+    gap = metrics["folds"][0]["train_validation_patient_auc_gap"]
+    assert gap == metrics["folds"][0]["train_patient_auc"] - metrics["folds"][0]["patient"]["auc"]
 
     with pytest.raises(FileExistsError):
         run_dir.mkdir()
+
+
+def test_resume_continues_interrupted_run_identically(
+    training_project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data, reference_config = smoke_config(runs_dir="reference", early_stopping_patience=5)
+    reference = run_experiment(training_project, data, reference_config)
+
+    # Interrupt during the second epoch of fold 3, after fold 0 has finished.
+    original_predict, calls = loop.predict, []
+
+    def interrupted_predict(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 4:
+            raise KeyboardInterrupt
+        return original_predict(*args, **kwargs)
+
+    monkeypatch.setattr(loop, "predict", interrupted_predict)
+    data, config = smoke_config(runs_dir="interrupted", early_stopping_patience=5)
+    with pytest.raises(KeyboardInterrupt):
+        run_experiment(training_project, data, config)
+    monkeypatch.setattr(loop, "predict", original_predict)
+    (run_dir,) = (training_project / "interrupted").iterdir()
+    assert not (run_dir / "metrics.json").exists()
+
+    resume_experiment(training_project, run_dir)
+
+    columns = ["fold", "epoch", "train_loss", "validation_loss", "validation_patient_auc"]
+    expected = pd.read_csv(reference / "history.csv")[columns]
+    resumed = pd.read_csv(run_dir / "history.csv")[columns]
+    pd.testing.assert_frame_equal(resumed, expected)
+    with pytest.raises(ValueError, match="never rewritten"):
+        resume_experiment(training_project, run_dir)

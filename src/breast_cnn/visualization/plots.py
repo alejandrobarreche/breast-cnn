@@ -250,43 +250,39 @@ def plot_dce_phases(image: torch.Tensor, *, sample_id: str, cohort: str, label: 
 
 
 def plot_learning_curves(history: pd.DataFrame, experiment: str) -> Figure:
-    """Loss per epoch (training and validation) and validation patient AUC, one line per fold."""
+    """Training and validation curves together, one line per fold; dot = selected epoch.
+
+    The selected epoch is the first maximum of the validation patient AUC, as in training.
+    """
     with plt.rc_context(STYLE):
         figure, (loss_axis, auc_axis) = plt.subplots(1, 2, figsize=(11, 4.2), layout="constrained")
         set_chart_title(
-            loss_axis,
-            "Pérdida por época",
-            f"Train y validación interna · corte · {experiment}",
+            loss_axis, "Pérdida por época", f"Train y validación interna · corte · {experiment}"
         )
         set_chart_title(
             auc_axis,
-            "AUC de validación por época",
-            "Validación interna · paciente · pCR positiva · media de cortes",
+            "AUC por paciente y época",
+            "Train y validación interna · paciente · pCR positiva · media de cortes",
         )
-        for fold, rows in history.groupby("fold"):
-            loss_axis.plot(rows["epoch"], rows["train_loss"], color=INK, linewidth=1, alpha=0.7)
-            loss_axis.plot(
-                rows["epoch"], rows["validation_loss"], color=MUTED, linewidth=1, linestyle="--"
-            )
-            auc_axis.plot(rows["epoch"], rows["validation_patient_auc"], color=INK, linewidth=1)
-            if rows["validation_patient_auc"].notna().any():
-                best = rows.loc[rows["validation_patient_auc"].idxmax()]
-                auc_axis.scatter(best["epoch"], best["validation_patient_auc"], color=INK, s=18)
-            auc_axis.annotate(
-                f"fold {fold}",
-                (rows["epoch"].iloc[-1], rows["validation_patient_auc"].iloc[-1]),
-                xytext=(4, 0),
-                textcoords="offset points",
-                va="center",
-                fontsize=8,
-                color=MUTED,
-            )
-        loss_axis.plot([], [], color=INK, label="Entrenamiento")
-        loss_axis.plot([], [], color=MUTED, linestyle="--", label="Validación")
-        loss_axis.legend(frameon=False, loc="lower left", ncols=2)
+        curves = (
+            (loss_axis, "train_loss", "validation_loss"),
+            (auc_axis, "train_patient_auc", "validation_patient_auc"),
+        )
+        for _, rows in history.groupby("fold"):
+            selected = rows.loc[rows["validation_patient_auc"].idxmax()]
+            for axis, train_column, validation_column in curves:
+                axis.plot(rows["epoch"], rows[train_column], color=INK, linewidth=1)
+                axis.plot(
+                    rows["epoch"], rows[validation_column], color=MUTED, linewidth=1, linestyle="--"
+                )
+                axis.scatter(selected["epoch"], selected[validation_column], color=INK, s=18)
+        auc_axis.plot([], [], color=INK, label="Entrenamiento")
+        auc_axis.plot([], [], color=MUTED, linestyle="--", label="Validación")
+        auc_axis.scatter([], [], color=INK, s=18, label="Época elegida")
+        figure.legend(frameon=False, loc="outside lower center", ncols=3)
         loss_axis.set(xlabel="Época", ylabel="BCE")
         auc_axis.axhline(0.5, color=GRID, linewidth=1.5)
-        auc_axis.set(xlabel="Época", ylabel="ROC-AUC", ylim=(0.3, 1.0))
+        auc_axis.set(xlabel="Época", ylabel="ROC-AUC", ylim=(0.3, 1.05))
         for axis in (loss_axis, auc_axis):
             axis.yaxis.set_major_formatter(
                 FuncFormatter(lambda value, _: f"{value:.1f}".replace(".", ","))
