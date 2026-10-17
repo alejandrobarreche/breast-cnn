@@ -47,6 +47,24 @@ def test_separable_stage_uses_depthwise_and_pointwise_convolutions() -> None:
     assert model.eval()(torch.rand(2, 3, 32, 32)).shape == (2,)
 
 
+def test_input_crop_and_pool_keep_the_input_contract() -> None:
+    model = build_model(ModelConfig.model_validate(small_config(input_crop=128, input_pool=2)))
+    rows = summarize_model(model, (3, 256, 256))
+    assert [row["output_shape"] for row in rows[:2]] == [(3, 128, 128), (3, 64, 64)]
+    image = torch.zeros(1, 3, 256, 256)
+    image[..., 64:192, 64:192] = torch.rand(1, 3, 128, 128)
+    border_changed = image.clone()
+    border_changed[..., :64, :] = 1.0
+    model.eval()
+    assert torch.equal(model(image), model(border_changed))
+
+
+def test_yaml_architectures_build() -> None:
+    for path in sorted((ROOT / "configs/model").glob("*.yaml")):
+        model = build_model(load_model_config(path)).eval()
+        assert model(torch.rand(1, 3, 256, 256)).shape == (1,), path.name
+
+
 def test_summary_tracks_shapes_and_parameters() -> None:
     model = build_model(ModelConfig.model_validate(small_config()))
     rows = summarize_model(model, (3, 32, 32))
@@ -84,6 +102,8 @@ def test_initialization_is_he_for_convolutions_and_zero_bias_for_output() -> Non
         {"stages": []},
         {"stages": [{"channels": 0, "convs": 1}]},
         {"kernel_size": 4},
+        {"input_crop": 300},
+        {"input_pool": 0},
         {"dropout": 1.0},
         {"unknown": 1},
     ],

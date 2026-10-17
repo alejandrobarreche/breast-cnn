@@ -1,0 +1,6 @@
+# @package _global_
+# baseline_weighted on the central 160 x 160 region.
+train:
+  experiment: crop160
+  weighted_loss: true
+  model: configs/model/crop160.yaml

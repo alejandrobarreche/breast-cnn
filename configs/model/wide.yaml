@@ -1,0 +1,12 @@
+# Baseline with twice the channels per stage (about four times the parameters).
+# Input [3, 256, 256] with channels PRE, EARLY, LATE (early fusion of the DCE phases).
+in_channels: 3
+kernel_size: 3
+activation: relu  # relu | leaky_relu | elu | gelu
+stages:
+  - {channels: 16, convs: 2}
+  - {channels: 32, convs: 2}
+  - {channels: 64, convs: 2}
+  - {channels: 128, convs: 2}
+  - {channels: 256, convs: 2}
+dropout: 0.3

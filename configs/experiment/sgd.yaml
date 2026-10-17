@@ -1,0 +1,7 @@
+# @package _global_
+# baseline_weighted optimized with SGD with momentum 0.9 instead of AdamW.
+train:
+  experiment: sgd
+  weighted_loss: true
+  optimizer: sgd
+  learning_rate: 0.01

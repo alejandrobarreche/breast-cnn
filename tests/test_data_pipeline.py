@@ -11,7 +11,7 @@ from torch.utils.data import SequentialSampler
 
 from breast_cnn.configuration import PipelineConfig, load_phase_one_config
 from breast_cnn.data.dataset import BreastDCEDataset
-from breast_cnn.data.loaders import create_data_loaders
+from breast_cnn.data.loaders import central_slices, create_data_loaders
 from breast_cnn.data.metadata import load_samples, summarize_folds
 from breast_cnn.data.transforms import RandomAffine, RandomHorizontalFlip, load_dce_triplet
 from breast_cnn.data.validation import validate_sample_frame
@@ -254,3 +254,12 @@ def test_affine_augmentation_is_rejected_outside_training(dataset_project: Path)
     samples = load_samples(dataset_project).iloc[[0]]
     with pytest.raises(ValueError, match="Augmentation is forbidden"):
         BreastDCEDataset(samples, dataset_project, affine=RandomAffine(rotation_degrees=10))
+
+
+def test_central_slices_keeps_middle_of_each_patient() -> None:
+    samples = pd.DataFrame(
+        {"patient_id": ["a"] * 5 + ["b"] * 2, "slice_index": [9, 5, 6, 7, 8, 3, 4]}
+    )
+    kept = central_slices(samples, 3)
+    assert sorted(kept.loc[kept.patient_id == "a", "slice_index"]) == [6, 7, 8]
+    assert sorted(kept.loc[kept.patient_id == "b", "slice_index"]) == [3, 4]

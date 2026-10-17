@@ -37,6 +37,11 @@ class ModelConfig(BaseModel):
     activation: Activation
     stages: list[StageConfig] = Field(min_length=1)
     dropout: float = Field(ge=0, lt=1)
+    # Fixed input preprocessing inside the network, so the input contract stays [3, 256, 256]:
+    # keep the central input_crop x input_crop region (the tumour is centred in MinCrop),
+    # then average-pool by input_pool to lower the resolution.
+    input_crop: int | None = Field(default=None, gt=0, le=256)
+    input_pool: int = Field(default=1, gt=0)
 
     def model_post_init(self, __context: object) -> None:
         if self.kernel_size % 2 == 0:
@@ -46,6 +51,19 @@ class ModelConfig(BaseModel):
 def load_model_config(path: Path | str) -> ModelConfig:
     """Read and validate an architecture YAML."""
     return ModelConfig.model_validate(OmegaConf.to_container(OmegaConf.load(path), resolve=True))
+
+
+class CenterCrop(nn.Module):
+    """Keep the central size x size region of a [B, C, H, W] tensor."""
+
+    def __init__(self, size: int) -> None:
+        super().__init__()
+        self.size = size
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        top = (x.shape[-2] - self.size) // 2
+        left = (x.shape[-1] - self.size) // 2
+        return x[..., top : top + self.size, left : left + self.size]
 
 
 class CNN(nn.Module):
@@ -64,6 +82,10 @@ class CNN(nn.Module):
 def build_model(config: ModelConfig) -> CNN:
     """Construct the network and apply the initialization described in `_initialize`."""
     layers: list[nn.Module] = []
+    if config.input_crop is not None:
+        layers.append(CenterCrop(config.input_crop))
+    if config.input_pool > 1:
+        layers.append(nn.AvgPool2d(config.input_pool))
     in_channels = config.in_channels
     for stage in config.stages:
         for _ in range(stage.convs):

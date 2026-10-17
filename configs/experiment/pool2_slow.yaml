@@ -1,0 +1,10 @@
+# @package _global_
+# augmented_slow on the whole field at half resolution.
+train:
+  experiment: pool2_slow
+  weighted_loss: true
+  model: configs/model/pool2.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001

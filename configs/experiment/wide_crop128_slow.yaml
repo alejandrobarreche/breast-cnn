@@ -1,0 +1,10 @@
+# @package _global_
+# augmented_slow with the wide model on the central 128 x 128 region.
+train:
+  experiment: wide_crop128_slow
+  weighted_loss: true
+  model: configs/model/wide_crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001

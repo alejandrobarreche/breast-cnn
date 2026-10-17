@@ -198,6 +198,7 @@ def fit_fold(
             config.rotation_degrees, config.max_translation, tuple(config.scale_range)
         ),
         patients_per_batch=config.patients_per_batch if config.loss_unit == "patient" else None,
+        train_slices_per_patient=config.train_slices_per_patient,
     )
     seed_everything(config.seed)
     model = build_model(model_config).to(device)
@@ -212,9 +213,17 @@ def fit_fold(
         config.loss_unit,
         config.patient_pooling,
     )
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
-    )
+    if config.optimizer == "sgd":
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=config.learning_rate,
+            momentum=0.9,
+            weight_decay=config.weight_decay,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
+        )
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
 

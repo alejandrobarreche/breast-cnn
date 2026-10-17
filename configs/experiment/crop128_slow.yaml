@@ -1,0 +1,10 @@
+# @package _global_
+# augmented_slow (geometric augmentation, learning rate 1e-4) on the central 128 x 128 region.
+train:
+  experiment: crop128_slow
+  weighted_loss: true
+  model: configs/model/crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001

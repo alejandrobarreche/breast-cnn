@@ -38,7 +38,7 @@ class TrainConfig(BaseModel):
     early_stopping_patience: int = Field(gt=0)
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
-    optimizer: Literal["adamw"]
+    optimizer: Literal["adamw", "sgd"]  # sgd: momentum 0.9
     learning_rate: float = Field(gt=0)
     weight_decay: float = Field(ge=0)
     horizontal_flip_probability: float = Field(ge=0, le=1)
@@ -50,6 +50,8 @@ class TrainConfig(BaseModel):
     patient_pooling: Literal["mean", "max"]
     patients_per_batch: int = Field(gt=0)
     label_smoothing: float = Field(ge=0, lt=0.5)
+    # Train on the k central slices of each patient only; validation keeps every slice.
+    train_slices_per_patient: int | None = Field(default=None, gt=0)
     threshold: float = Field(gt=0, lt=1)
     runs_dir: str
 

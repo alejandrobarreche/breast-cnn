@@ -1,0 +1,6 @@
+# @package _global_
+# baseline_weighted with three convolutions per stage.
+train:
+  experiment: deep
+  weighted_loss: true
+  model: configs/model/deep.yaml

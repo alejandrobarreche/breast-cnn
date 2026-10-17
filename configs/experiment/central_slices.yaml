@@ -1,0 +1,6 @@
+# @package _global_
+# baseline_weighted trained on the 4 central slices of each patient (validation: all).
+train:
+  experiment: central_slices
+  weighted_loss: true
+  train_slices_per_patient: 4

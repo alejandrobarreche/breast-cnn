@@ -179,12 +179,15 @@ python scripts/train.py +experiment=patient_mean    # pérdida por paciente: med
 python scripts/train.py +experiment=patient_max     # pérdida por paciente: máximo de logits de sus cortes
 python scripts/train.py +experiment=label_smoothing # objetivos 0,05 / 0,95
 python scripts/train.py +experiment=patient_mean_large_batch  # patient_mean con 12 pacientes por lote
+python scripts/train.py +experiment=crop128         # región central de 128 x 128 (recorte dentro del modelo)
+python scripts/train.py +experiment=central_slices  # entrena con los 4 cortes centrales de cada paciente
+python scripts/train.py +experiment=sgd             # SGD con momento 0,9 en lugar de AdamW
 ```
 
-Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente):
+Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente). Por ejemplo, la batería de entrada, capacidad y optimización (justificación en `documentation/research/pcr_input_and_training.md`):
 
 ```bash
-python scripts/train.py --experiments patient_mean_large_batch patient_max label_smoothing
+python scripts/train.py --experiments crop128 crop160 pool2 central_slices wide deep sgd crop128_slow crop128_central_slow pool2_slow wide_slow wide_crop128_slow
 ```
 
 Cada época imprime la pérdida y el AUC por paciente de train y validación. Si un entrenamiento se interrumpe, se continúa desde la última época completada:

@@ -32,6 +32,15 @@ def seed_worker(worker_id: int) -> None:
     np.random.seed(worker_seed)
 
 
+def central_slices(samples: pd.DataFrame, k: int) -> pd.DataFrame:
+    """Keep the k central slices (by slice_index) of each patient; all if it has fewer."""
+    ordered = samples.sort_values(["patient_id", "slice_index"])
+    position = ordered.groupby("patient_id").cumcount()
+    count = ordered.groupby("patient_id")["slice_index"].transform("size")
+    start = (count - k).clip(lower=0) // 2
+    return ordered[(position >= start) & (position < start + k)].sort_index()
+
+
 class PatientBatchSampler(Sampler[list[int]]):
     """Batches made of whole patients: every slice of a patient lands in the same batch.
 
@@ -71,6 +80,7 @@ def create_data_loaders(
     horizontal_flip_probability: float = 0.0,
     affine: RandomAffine | None = None,
     patients_per_batch: int | None = None,
+    train_slices_per_patient: int | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Validate the index, seed RNGs and return training/validation loaders.
 
@@ -78,7 +88,8 @@ def create_data_loaders(
     so iterating validation does not change training's shuffle/worker seeds.
     Neither loader drops the last batch. New calls reset main-process RNGs.
     With `patients_per_batch`, training batches hold whole patients instead of
-    `batch_size` shuffled slices; validation is unchanged.
+    `batch_size` shuffled slices; validation is unchanged. With
+    `train_slices_per_patient`, training keeps only the central slices of each patient.
     """
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError("batch_size must be a positive integer")
@@ -90,6 +101,8 @@ def create_data_loaders(
     training, validation = split_train_validation(samples, validation_fold)
     if training.empty or validation.empty:
         raise ValueError("Training and validation must both contain samples")
+    if train_slices_per_patient is not None:
+        training = central_slices(training, train_slices_per_patient)
     train_dataset = BreastDCEDataset(
         training,
         project_root,

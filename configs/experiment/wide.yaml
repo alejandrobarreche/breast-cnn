@@ -1,0 +1,6 @@
+# @package _global_
+# baseline_weighted with twice the channels per stage.
+train:
+  experiment: wide
+  weighted_loss: true
+  model: configs/model/wide.yaml

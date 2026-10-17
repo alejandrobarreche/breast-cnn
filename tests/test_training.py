@@ -129,6 +129,22 @@ def smoke_config(**changes: object) -> tuple[DataConfig, TrainConfig]:
     return data, TrainConfig(**(config | changes))
 
 
+def test_every_experiment_config_composes() -> None:
+    for path in sorted((ROOT / "configs/experiment").glob("*.yaml")):
+        _, config = load_train_config(ROOT, [f"+experiment={path.stem}"])
+        assert config.experiment == path.stem
+        assert (ROOT / config.model).is_file()
+
+
+def test_sgd_and_central_slices_run(training_project: Path) -> None:
+    data, config = smoke_config(optimizer="sgd", learning_rate=0.01, train_slices_per_patient=1)
+    run_dir = run_experiment(training_project, data, config)
+    metrics = json.loads((run_dir / "metrics.json").read_text())
+    assert metrics["folds"][0]["training_slices"] == 8  # 8 training patients x 1 slice
+    assert metrics["folds"][0]["patient"]["n"] == 2  # validation keeps every slice
+    assert len(pd.read_csv(run_dir / "predictions_validation.csv")) == 8
+
+
 def test_run_experiment_writes_complete_run(training_project: Path) -> None:
     data, config = smoke_config()
     run_dir = run_experiment(training_project, data, config)

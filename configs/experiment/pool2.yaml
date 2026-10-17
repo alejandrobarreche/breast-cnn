@@ -1,0 +1,6 @@
+# @package _global_
+# baseline_weighted on the whole field at half resolution (128 x 128).
+train:
+  experiment: pool2
+  weighted_loss: true
+  model: configs/model/pool2.yaml

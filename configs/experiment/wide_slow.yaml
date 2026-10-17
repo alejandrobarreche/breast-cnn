@@ -1,0 +1,10 @@
+# @package _global_
+# augmented_slow with the wide model.
+train:
+  experiment: wide_slow
+  weighted_loss: true
+  model: configs/model/wide.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
