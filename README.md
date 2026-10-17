@@ -174,6 +174,7 @@ python scripts/train.py +experiment=baseline_weighted
 python scripts/train.py +experiment=augmented     # aumento geométrico conjunto
 python scripts/train.py +experiment=regularized   # tasa de aprendizaje 3e-4, decaimiento 1e-2
 python scripts/train.py +experiment=separable     # convoluciones separables en profundidad
+python scripts/train.py +experiment=augmented_slow  # aumento geométrico y tasa de aprendizaje 1e-4
 ```
 
 Cada época imprime la pérdida y el AUC por paciente de train y validación. Si un entrenamiento se interrumpe, se continúa desde la última época completada:

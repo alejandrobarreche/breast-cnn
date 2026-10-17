@@ -1,0 +1,10 @@
+# @package _global_
+# Joint geometric augmentation plus a lower learning rate on top of baseline_weighted.
+# Two factors at once: the aim is the slow-learning regime, not attributing the effect.
+train:
+  experiment: augmented_slow
+  weighted_loss: true
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
