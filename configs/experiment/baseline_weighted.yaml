@@ -1,0 +1,5 @@
+# @package _global_
+# Baseline CNN with BCEWithLogitsLoss(pos_weight = N0 / N1) from each training split.
+train:
+  experiment: baseline_weighted
+  weighted_loss: true

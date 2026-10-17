@@ -166,6 +166,13 @@ Arquitectura:
 python scripts/describe_model.py configs/model/baseline.yaml   # tabla de capas y parámetros
 ```
 
+Entrenamiento (validación cruzada con los 5 `fold` de `train`; un experimento por fichero de `configs/experiment/`):
+
+```bash
+python scripts/train.py +experiment=baseline_unweighted
+python scripts/train.py +experiment=baseline_weighted
+```
+
 Tests y estilo:
 
 ```bash

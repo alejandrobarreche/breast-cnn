@@ -66,7 +66,13 @@ def create_data_loaders(
     )
     validation_dataset = BreastDCEDataset(validation, project_root, path_aliases=path_aliases)
     seed_everything(seed)
-    common = {"batch_size": batch_size, "num_workers": num_workers, "worker_init_fn": seed_worker}
+    # Persistent workers avoid re-spawning processes every epoch (costly on Windows).
+    common = {
+        "batch_size": batch_size,
+        "num_workers": num_workers,
+        "worker_init_fn": seed_worker,
+        "persistent_workers": num_workers > 0,
+    }
     return (
         DataLoader(
             train_dataset,

@@ -1,0 +1,5 @@
+# @package _global_
+# Baseline CNN with plain BCEWithLogitsLoss.
+train:
+  experiment: baseline_unweighted
+  weighted_loss: false

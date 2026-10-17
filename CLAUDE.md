@@ -149,12 +149,13 @@ Hay dos máquinas con funciones separadas. Claude identifica en cuál está por 
 
 ```text
 runs/<AAAAMMDD-HHMM>_<experimento>/
-├── config.yaml       configuración resuelta usada
-├── environment.json  commit, dispositivo, GPU, versiones, tiempos, memoria máxima
-├── history.csv       métricas por época
-├── metrics.json      métricas finales por corte y por paciente
-├── figures/          curvas, ROC, matriz de confusión
-└── model.pt          pesos (fuera de Git)
+├── config.yaml                 configuración resuelta usada (datos, entrenamiento, arquitectura)
+├── environment.json            commit, dispositivo, GPU, versiones, tiempos, memoria máxima
+├── history.csv                 métricas por fold y época
+├── metrics.json                métricas de la mejor época por fold (corte y paciente) y media ± desviación
+├── predictions_validation.csv  probabilidad por corte de la validación interna, para el análisis en el Mac
+├── figures/                    curvas de aprendizaje
+└── model_fold<k>.pt            pesos de la mejor época de cada fold (fuera de Git)
 ```
 
 ## 13. Git
