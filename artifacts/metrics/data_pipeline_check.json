@@ -1,0 +1,135 @@
+{
+  "status": "ok",
+  "scope": "train_and_internal_validation_only",
+  "config": {
+    "validation_fold": 0,
+    "batch_size": 8,
+    "num_workers": 0,
+    "seed": 2026,
+    "horizontal_flip_probability": 0.0,
+    "report_path": "artifacts/metrics/data_pipeline_check.json"
+  },
+  "provenance": {
+    "metadata_sha256": {
+      "samples.csv": "7ddd0ecc8272e6460211bd63c1479513bf815e3ea518d1b6bafdcd69f9a75c03",
+      "patients.csv": "8db85db6f9dce941ac38a7fa8b30b30d4e3f31d9849768ccd53a83dc15e2391e",
+      "statistics.json": "dcd0abb646cdbaa136c443c85477c6bc4c851c21ac0e5f19d028ab91e1c0560d",
+      "excluded_patients.csv": "43c1ac4fe83efa4b83f45e43144465c82d6dc41aabb854aa4523d7beca88aaab"
+    },
+    "versions": {
+      "breast-cnn": "0.0.0",
+      "torch": "2.14.0",
+      "numpy": "2.5.3",
+      "pandas": "3.0.6",
+      "pillow": "12.3.0",
+      "matplotlib": "3.11.2",
+      "hydra-core": "1.3.7"
+    },
+    "data_config": {
+      "metadata_dir": "metadata",
+      "image_path_aliases": {
+        "dataset": "data"
+      },
+      "expected_image_size": [
+        256,
+        256
+      ]
+    }
+  },
+  "train_batch": {
+    "shape": [
+      8,
+      3,
+      256,
+      256
+    ],
+    "dtype": "torch.float32",
+    "range": [
+      0.0,
+      1.0
+    ],
+    "label_shape": [
+      8
+    ],
+    "label_dtype": "torch.float32",
+    "sample_ids": [
+      "ISPY2-395379_z051",
+      "ACRIN-6698-580632_z024",
+      "ACRIN-6698-839274_z035",
+      "ISPY2-273745_z024",
+      "ACRIN-6698-188700_z019",
+      "ISPY2-340186_z018",
+      "ACRIN-6698-239910_z020",
+      "ISPY2-596458_z017"
+    ],
+    "patient_ids": [
+      "ISPY2-395379",
+      "ACRIN-6698-580632",
+      "ACRIN-6698-839274",
+      "ISPY2-273745",
+      "ACRIN-6698-188700",
+      "ISPY2-340186",
+      "ACRIN-6698-239910",
+      "ISPY2-596458"
+    ]
+  },
+  "validation": {
+    "slices": 2186,
+    "patients": 219,
+    "batches_per_pass": 274,
+    "last_batch_size": 2,
+    "passes": 2,
+    "sha256_per_pass": [
+      "a6d0d947d7a51ac0d8beede36d442b9a8891f744ca40639d456e747e18462f2f",
+      "a6d0d947d7a51ac0d8beede36d442b9a8891f744ca40639d456e747e18462f2f"
+    ],
+    "ordered_complete": true
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "training_patients": 878,
+      "training_slices": 8759,
+      "validation_patients": 219,
+      "validation_slices": 2186,
+      "validation_patients_pcr_0": 155,
+      "validation_patients_pcr_1": 64
+    },
+    {
+      "fold": 1,
+      "training_patients": 878,
+      "training_slices": 8755,
+      "validation_patients": 219,
+      "validation_slices": 2190,
+      "validation_patients_pcr_0": 157,
+      "validation_patients_pcr_1": 62
+    },
+    {
+      "fold": 2,
+      "training_patients": 877,
+      "training_slices": 8753,
+      "validation_patients": 220,
+      "validation_slices": 2192,
+      "validation_patients_pcr_0": 161,
+      "validation_patients_pcr_1": 59
+    },
+    {
+      "fold": 3,
+      "training_patients": 877,
+      "training_slices": 8753,
+      "validation_patients": 220,
+      "validation_slices": 2192,
+      "validation_patients_pcr_0": 145,
+      "validation_patients_pcr_1": 75
+    },
+    {
+      "fold": 4,
+      "training_patients": 878,
+      "training_slices": 8760,
+      "validation_patients": 219,
+      "validation_slices": 2185,
+      "validation_patients_pcr_0": 157,
+      "validation_patients_pcr_1": 62
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+data:
+  metadata_dir: metadata
+  image_path_aliases:
+    dataset: data
+  expected_image_size: [256, 256]
+
+audit:
+  validation_fold: 0
+
+download:
+  base_url: https://storage.googleapis.com/usecasesf-breastdcedl-alumnos-8264/breastdcedl
+  workers: 16
+  timeout_seconds: 60
+
+# Phase-1 inspection settings, not an approved training protocol.
+pipeline:
+  validation_fold: 0
+  batch_size: 8
+  num_workers: 0
+  seed: 2026
+  horizontal_flip_probability: 0.0
+  report_path: artifacts/metrics/data_pipeline_check.json
+
+eda:
+  seed: 2026
+  figures_dir: artifacts/figures
+  report_path: artifacts/metrics/eda_train.json

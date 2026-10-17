@@ -1,0 +1,759 @@
+{
+  "scope": "public_train_only",
+  "patients": 1097,
+  "slices": 10945,
+  "config": {
+    "seed": 2026,
+    "figures_dir": "artifacts/figures",
+    "report_path": "artifacts/metrics/eda_train.json"
+  },
+  "provenance": {
+    "metadata_sha256": {
+      "samples.csv": "7ddd0ecc8272e6460211bd63c1479513bf815e3ea518d1b6bafdcd69f9a75c03",
+      "patients.csv": "8db85db6f9dce941ac38a7fa8b30b30d4e3f31d9849768ccd53a83dc15e2391e",
+      "statistics.json": "dcd0abb646cdbaa136c443c85477c6bc4c851c21ac0e5f19d028ab91e1c0560d",
+      "excluded_patients.csv": "43c1ac4fe83efa4b83f45e43144465c82d6dc41aabb854aa4523d7beca88aaab"
+    },
+    "versions": {
+      "breast-cnn": "0.0.0",
+      "torch": "2.14.0",
+      "numpy": "2.5.3",
+      "pandas": "3.0.6",
+      "pillow": "12.3.0",
+      "matplotlib": "3.11.2",
+      "hydra-core": "1.3.7"
+    },
+    "data_config": {
+      "metadata_dir": "metadata",
+      "image_path_aliases": {
+        "dataset": "data"
+      },
+      "expected_image_size": [
+        256,
+        256
+      ]
+    }
+  },
+  "tables": {
+    "class_balance": [
+      {
+        "unit": "patient",
+        "pCR": 0,
+        "count": 775,
+        "fraction": 0.7064721969
+      },
+      {
+        "unit": "patient",
+        "pCR": 1,
+        "count": 322,
+        "fraction": 0.2935278031
+      },
+      {
+        "unit": "slice",
+        "pCR": 0,
+        "count": 7729,
+        "fraction": 0.7061671996
+      },
+      {
+        "unit": "slice",
+        "pCR": 1,
+        "count": 3216,
+        "fraction": 0.2938328004
+      }
+    ],
+    "cohort_summary": [
+      {
+        "data": "duke",
+        "patients": 209,
+        "pcr_positive": 44,
+        "slices": 2070,
+        "median_slices": 10.0,
+        "min_slices": 5,
+        "pcr_fraction": 0.2105263158
+      },
+      {
+        "data": "spy1",
+        "patients": 104,
+        "pcr_positive": 26,
+        "slices": 1040,
+        "median_slices": 10.0,
+        "min_slices": 10,
+        "pcr_fraction": 0.25
+      },
+      {
+        "data": "spy2",
+        "patients": 784,
+        "pcr_positive": 252,
+        "slices": 7835,
+        "median_slices": 10.0,
+        "min_slices": 5,
+        "pcr_fraction": 0.3214285714
+      }
+    ],
+    "slices_per_patient": [
+      {
+        "n_slices": 5,
+        "patients": 2
+      },
+      {
+        "n_slices": 6,
+        "patients": 3
+      },
+      {
+        "n_slices": 7,
+        "patients": 1
+      },
+      {
+        "n_slices": 10,
+        "patients": 1091
+      }
+    ],
+    "missing_values": [
+      {
+        "column": "pid",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "pCR",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "n_xy",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "n_z",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "n_times",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "pre",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "post_early",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "post_late",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "slice_thick",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "xy_spacing",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "mask_start",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "mask_end",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "sraw",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "eraw",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "scol",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "ecol",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "tum_vol",
+        "missing": 1,
+        "total": 1097,
+        "fraction": 0.000911577
+      },
+      {
+        "column": "age",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "menopause",
+        "missing": 134,
+        "total": 1097,
+        "fraction": 0.1221513218
+      },
+      {
+        "column": "race_white",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "race_black",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "HR",
+        "missing": 2,
+        "total": 1097,
+        "fraction": 0.0018231541
+      },
+      {
+        "column": "HER2",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "HR_HER2_STATUS",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "TripleNeg",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "HER2pos",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "HRposHER2neg",
+        "missing": 3,
+        "total": 1097,
+        "fraction": 0.0027347311
+      },
+      {
+        "column": "data",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "test",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      },
+      {
+        "column": "split",
+        "missing": 0,
+        "total": 1097,
+        "fraction": 0.0
+      }
+    ],
+    "missing_by_cohort": [
+      {
+        "data": "duke",
+        "pid": 0,
+        "pCR": 0,
+        "n_xy": 0,
+        "n_z": 0,
+        "n_times": 0,
+        "pre": 0,
+        "post_early": 0,
+        "post_late": 0,
+        "slice_thick": 0,
+        "xy_spacing": 0,
+        "mask_start": 0,
+        "mask_end": 0,
+        "sraw": 0,
+        "eraw": 0,
+        "scol": 0,
+        "ecol": 0,
+        "tum_vol": 1,
+        "age": 0,
+        "menopause": 0,
+        "race_white": 0,
+        "race_black": 0,
+        "HR": 0,
+        "HER2": 0,
+        "HR_HER2_STATUS": 0,
+        "TripleNeg": 0,
+        "HER2pos": 0,
+        "HRposHER2neg": 0,
+        "test": 0,
+        "split": 0
+      },
+      {
+        "data": "spy1",
+        "pid": 0,
+        "pCR": 0,
+        "n_xy": 0,
+        "n_z": 0,
+        "n_times": 0,
+        "pre": 0,
+        "post_early": 0,
+        "post_late": 0,
+        "slice_thick": 0,
+        "xy_spacing": 0,
+        "mask_start": 0,
+        "mask_end": 0,
+        "sraw": 0,
+        "eraw": 0,
+        "scol": 0,
+        "ecol": 0,
+        "tum_vol": 0,
+        "age": 0,
+        "menopause": 104,
+        "race_white": 0,
+        "race_black": 0,
+        "HR": 2,
+        "HER2": 3,
+        "HR_HER2_STATUS": 3,
+        "TripleNeg": 3,
+        "HER2pos": 3,
+        "HRposHER2neg": 3,
+        "test": 0,
+        "split": 0
+      },
+      {
+        "data": "spy2",
+        "pid": 0,
+        "pCR": 0,
+        "n_xy": 0,
+        "n_z": 0,
+        "n_times": 0,
+        "pre": 0,
+        "post_early": 0,
+        "post_late": 0,
+        "slice_thick": 0,
+        "xy_spacing": 0,
+        "mask_start": 0,
+        "mask_end": 0,
+        "sraw": 0,
+        "eraw": 0,
+        "scol": 0,
+        "ecol": 0,
+        "tum_vol": 0,
+        "age": 3,
+        "menopause": 30,
+        "race_white": 3,
+        "race_black": 3,
+        "HR": 0,
+        "HER2": 0,
+        "HR_HER2_STATUS": 0,
+        "TripleNeg": 0,
+        "HER2pos": 0,
+        "HRposHER2neg": 0,
+        "test": 0,
+        "split": 0
+      }
+    ],
+    "numeric_summary": [
+      {
+        "column": "age",
+        "count": 1094.0,
+        "mean": 48.6649177331,
+        "std": 10.4922602304,
+        "min": 23.0,
+        "25%": 41.0225,
+        "50%": 48.0,
+        "75%": 56.0,
+        "95%": 67.0,
+        "max": 77.0
+      },
+      {
+        "column": "tum_vol",
+        "count": 1096.0,
+        "mean": 26.5384607312,
+        "std": 44.6515948858,
+        "min": 0.0654328139,
+        "25%": 5.5904319754,
+        "50%": 12.7346771154,
+        "75%": 27.922851115,
+        "95%": 94.6514480591,
+        "max": 495.0084233554
+      },
+      {
+        "column": "n_z",
+        "count": 1097.0,
+        "mean": 88.710118505,
+        "std": 45.800003762,
+        "min": 9.0,
+        "25%": 64.0,
+        "50%": 80.0,
+        "75%": 134.0,
+        "95%": 160.0,
+        "max": 256.0
+      },
+      {
+        "column": "n_times",
+        "count": 1097.0,
+        "mean": 6.290793072,
+        "std": 1.5955678262,
+        "min": 3.0,
+        "25%": 5.0,
+        "50%": 7.0,
+        "75%": 7.0,
+        "95%": 8.0,
+        "max": 10.0
+      },
+      {
+        "column": "slice_thick",
+        "count": 1097.0,
+        "mean": 1.8026416896,
+        "std": 0.5682408242,
+        "min": 0.799997,
+        "25%": 1.2,
+        "50%": 2.0,
+        "75%": 2.2,
+        "95%": 2.5,
+        "max": 4.0
+      },
+      {
+        "column": "xy_spacing",
+        "count": 1097.0,
+        "mean": 0.7185604972,
+        "std": 0.1430742903,
+        "min": 0.3125,
+        "25%": 0.625,
+        "50%": 0.7031,
+        "75%": 0.78125,
+        "95%": 0.9375,
+        "max": 1.40625
+      }
+    ],
+    "subtype_balance": [
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 0,
+        "patients": 39
+      },
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 1,
+        "patients": 18
+      },
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 0,
+        "patients": 97
+      },
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 1,
+        "patients": 9
+      },
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 0,
+        "patients": 29
+      },
+      {
+        "data": "duke",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 1,
+        "patients": 17
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 0,
+        "patients": 18
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 1,
+        "patients": 14
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 0,
+        "patients": 39
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 1,
+        "patients": 3
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 0,
+        "patients": 19
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 1,
+        "patients": 8
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": null,
+        "pCR": 0,
+        "patients": 2
+      },
+      {
+        "data": "spy1",
+        "HR_HER2_STATUS": null,
+        "pCR": 1,
+        "patients": 1
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 0,
+        "patients": 107
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "HER2pos",
+        "pCR": 1,
+        "patients": 91
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 0,
+        "patients": 253
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "HRposHER2neg",
+        "pCR": 1,
+        "patients": 52
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 0,
+        "patients": 172
+      },
+      {
+        "data": "spy2",
+        "HR_HER2_STATUS": "TripleNeg",
+        "pCR": 1,
+        "patients": 109
+      }
+    ]
+  },
+  "folds": [
+    {
+      "fold": 0,
+      "training_patients": 878,
+      "training_slices": 8759,
+      "validation_patients": 219,
+      "validation_slices": 2186,
+      "validation_patients_pcr_0": 155,
+      "validation_patients_pcr_1": 64
+    },
+    {
+      "fold": 1,
+      "training_patients": 878,
+      "training_slices": 8755,
+      "validation_patients": 219,
+      "validation_slices": 2190,
+      "validation_patients_pcr_0": 157,
+      "validation_patients_pcr_1": 62
+    },
+    {
+      "fold": 2,
+      "training_patients": 877,
+      "training_slices": 8753,
+      "validation_patients": 220,
+      "validation_slices": 2192,
+      "validation_patients_pcr_0": 161,
+      "validation_patients_pcr_1": 59
+    },
+    {
+      "fold": 3,
+      "training_patients": 877,
+      "training_slices": 8753,
+      "validation_patients": 220,
+      "validation_slices": 2192,
+      "validation_patients_pcr_0": 145,
+      "validation_patients_pcr_1": 75
+    },
+    {
+      "fold": 4,
+      "training_patients": 878,
+      "training_slices": 8760,
+      "validation_patients": 219,
+      "validation_slices": 2185,
+      "validation_patients_pcr_0": 157,
+      "validation_patients_pcr_1": 62
+    }
+  ],
+  "example_selection": "One seeded patient per cohort/pCR; middle available slice after sorting",
+  "examples": [
+    {
+      "sample_id": "Breast_MRI_758_z008",
+      "patient_id": "Breast_MRI_758",
+      "cohort": "duke",
+      "pCR": 0,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.11987096071243286,
+        "EARLY": 0.173682302236557,
+        "LATE": 0.19496071338653564
+      },
+      "enhancement_mean": 0.05381134897470474,
+      "enhancement_range": [
+        -0.501960813999176,
+        1.0
+      ]
+    },
+    {
+      "sample_id": "Breast_MRI_142_z007",
+      "patient_id": "Breast_MRI_142",
+      "cohort": "duke",
+      "pCR": 1,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.11843621730804443,
+        "EARLY": 0.2519642114639282,
+        "LATE": 0.24241602420806885
+      },
+      "enhancement_mean": 0.1335279941558838,
+      "enhancement_range": [
+        -0.4470588266849518,
+        0.9450980424880981
+      ]
+    },
+    {
+      "sample_id": "ISPY1_1003_z015",
+      "patient_id": "ISPY1_1003",
+      "cohort": "spy1",
+      "pCR": 0,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.12672963738441467,
+        "EARLY": 0.16813068091869354,
+        "LATE": 0.17607638239860535
+      },
+      "enhancement_mean": 0.04140104353427887,
+      "enhancement_range": [
+        -0.29803919792175293,
+        0.7568627595901489
+      ]
+    },
+    {
+      "sample_id": "ISPY1_1176_z013",
+      "patient_id": "ISPY1_1176",
+      "cohort": "spy1",
+      "pCR": 1,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.16939620673656464,
+        "EARLY": 0.23889485001564026,
+        "LATE": 0.27671438455581665
+      },
+      "enhancement_mean": 0.06949864327907562,
+      "enhancement_range": [
+        -0.4078431725502014,
+        0.8901960849761963
+      ]
+    },
+    {
+      "sample_id": "ISPY2-227832_z034",
+      "patient_id": "ISPY2-227832",
+      "cohort": "spy2",
+      "pCR": 0,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.11842072010040283,
+        "EARLY": 0.19632121920585632,
+        "LATE": 0.20432494580745697
+      },
+      "enhancement_mean": 0.0779004842042923,
+      "enhancement_range": [
+        -0.3450980484485626,
+        0.9098039269447327
+      ]
+    },
+    {
+      "sample_id": "ISPY2-303685_z010",
+      "patient_id": "ISPY2-303685",
+      "cohort": "spy2",
+      "pCR": 1,
+      "split": "train",
+      "phase_means": {
+        "PRE": 0.13281787931919098,
+        "EARLY": 0.16309460997581482,
+        "LATE": 0.18219509720802307
+      },
+      "enhancement_mean": 0.030276726931333542,
+      "enhancement_range": [
+        -0.4431372582912445,
+        0.7607843279838562
+      ]
+    }
+  ],
+  "figures": [
+    "artifacts/figures/class_balance_train_patient.png",
+    "artifacts/figures/class_balance_train_slice.png",
+    "artifacts/figures/slices_per_patient_train_patient.png",
+    "artifacts/figures/cohort_distribution_train_patient.png",
+    "artifacts/figures/missing_values_train_patient.png",
+    "artifacts/figures/dce_phases_breast_mri_758_z008.png",
+    "artifacts/figures/dce_phases_breast_mri_142_z007.png",
+    "artifacts/figures/dce_phases_ispy1_1003_z015.png",
+    "artifacts/figures/dce_phases_ispy1_1176_z013.png",
+    "artifacts/figures/dce_phases_ispy2_227832_z034.png",
+    "artifacts/figures/dce_phases_ispy2_303685_z010.png"
+  ],
+  "limitations": [
+    "Slices are correlated within patients; patient is the statistical unit.",
+    "Examples are illustrative, not population intensity estimates or segmentations.",
+    "No clinical imputation, normalization fitting or test EDA is performed.",
+    "tum_vol and acquisition summaries retain source units; no unit conversion is inferred."
+  ]
+}

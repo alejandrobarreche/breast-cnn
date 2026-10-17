@@ -1,0 +1,113 @@
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+
+[project]
+name = "breast-cnn"
+version = "0.0.0"
+description = "Academic 2D CNN pipeline for pCR prediction from DCE-MRI"
+readme = "README.md"
+requires-python = ">=3.11"
+license-files = ["LICENSE"]
+
+dependencies = [
+    "hydra-core>=1.3",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "omegaconf>=2.3",
+    "pandas>=2.2",
+    "pillow>=10",
+    "pydantic>=2.6",
+    "requests>=2.31",
+    "scikit-learn>=1.4",
+    "tqdm>=4.66",
+    "urllib3>=2.0",
+]
+
+
+# ---------------------------------------------------------------------------
+# Poetry
+# ---------------------------------------------------------------------------
+
+[tool.poetry]
+requires-poetry = ">=2.3,<3.0"
+
+packages = [
+    { include = "breast_cnn", from = "src" },
+]
+
+
+# ---------------------------------------------------------------------------
+# Development
+# ---------------------------------------------------------------------------
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+jupyter = ">=1.0"
+pre-commit = ">=4.0"
+pytest = ">=8.0"
+ruff = ">=0.9"
+
+
+# ---------------------------------------------------------------------------
+# Experiment tracking
+# ---------------------------------------------------------------------------
+
+[tool.poetry.group.experiment]
+optional = true
+
+[tool.poetry.group.experiment.dependencies]
+mlflow = ">=2.10"
+
+
+# ---------------------------------------------------------------------------
+# Web
+# ---------------------------------------------------------------------------
+
+[tool.poetry.group.web]
+optional = true
+
+[tool.poetry.group.web.dependencies]
+fastapi = ">=0.110"
+python-multipart = ">=0.0.9"
+uvicorn = ">=0.27"
+
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+
+
+# ---------------------------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "documentation/",
+]
+
+[tool.ruff.lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

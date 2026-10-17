@@ -1,0 +1,44 @@
+.DS_Store
+.idea/
+
+# Local dataset images are distributed separately from the source code.
+/data/
+
+# Local bibliography exports and third-party article copies.
+/CNN Cancer Detection.csv
+/documentation/papers/*.pdf
+
+# Generated outputs; selected evidence in figures/ and metrics/ may be committed.
+/artifacts/*
+!/artifacts/figures/
+!/artifacts/metrics/
+/mlruns/
+/mlartifacts/
+/mlflow.db
+/mlflow.db-*
+/outputs/
+/multirun/
+
+# Local secrets and environment overrides.
+.env
+.env.*
+!.env.example
+
+# Python and notebook caches.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Environments and packaging outputs.
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Model checkpoints.
+*.ckpt
+*.pt
+*.pth

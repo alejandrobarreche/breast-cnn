@@ -1,0 +1,122 @@
+{
+  "summary": {
+    "patients": 1273,
+    "samples": 12703,
+    "excluded_patients": 2,
+    "patients_by_split": {
+      "test": 176,
+      "train": 1097
+    },
+    "samples_by_split": {
+      "test": 1758,
+      "train": 10945
+    },
+    "full_image_check": true,
+    "validation_fold": 0,
+    "training_samples": 8759,
+    "validation_samples": 2186,
+    "training_patients": 878,
+    "validation_patients": 219,
+    "expected_image_paths": 38109,
+    "resolved_image_paths": 38109
+  },
+  "details": {
+    "patient_missing_values": {
+      "tum_vol": 1,
+      "age": 3,
+      "menopause": 172,
+      "race_white": 3,
+      "race_black": 3,
+      "HR": 2,
+      "HER2": 5,
+      "HR_HER2_STATUS": 5,
+      "TripleNeg": 5,
+      "HER2pos": 5,
+      "HRposHER2neg": 5
+    },
+    "patient_cohorts": {
+      "duke": 251,
+      "spy1": 139,
+      "spy2": 883
+    },
+    "patient_pcr_by_split": {
+      "test": {
+        "pCR_0": 123,
+        "pCR_1": 53
+      },
+      "train": {
+        "pCR_0": 775,
+        "pCR_1": 322
+      }
+    },
+    "sample_pcr_by_split": {
+      "test": {
+        "pCR_0": 1228,
+        "pCR_1": 530
+      },
+      "train": {
+        "pCR_0": 7729,
+        "pCR_1": 3216
+      }
+    },
+    "samples_per_patient": {
+      "min": 5,
+      "median": 10.0,
+      "max": 10
+    },
+    "computed_statistics": {
+      "totals": {
+        "patients": 1273,
+        "samples": 12703,
+        "excluded_patients": 2
+      },
+      "patients_by_split": {
+        "test": 176,
+        "train": 1097
+      },
+      "samples_by_split": {
+        "test": 1758,
+        "train": 10945
+      },
+      "patients_by_split_and_pcr": {
+        "test": {
+          "pCR_0": 123,
+          "pCR_1": 53
+        },
+        "train": {
+          "pCR_0": 775,
+          "pCR_1": 322
+        }
+      },
+      "samples_by_split_and_pcr": {
+        "test": {
+          "pCR_0": 1228,
+          "pCR_1": 530
+        },
+        "train": {
+          "pCR_0": 7729,
+          "pCR_1": 3216
+        }
+      }
+    },
+    "image_inspection": {
+      "checked": 38109,
+      "formats": {
+        "PNG": 38109
+      },
+      "modes": {
+        "L": 38109
+      },
+      "dtypes": {
+        "uint8": 38109
+      },
+      "pixel_range": [
+        0,
+        255
+      ]
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "status": "ok"
+}
