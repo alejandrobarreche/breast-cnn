@@ -1,0 +1,9 @@
+# @package _global_
+# patient_mean with 12 patients per batch (~120 slices) instead of 3: more labels per
+# gradient step and BatchNorm statistics drawn from more patients.
+train:
+  experiment: patient_mean_large_batch
+  weighted_loss: true
+  loss_unit: patient
+  patient_pooling: mean
+  patients_per_batch: 12

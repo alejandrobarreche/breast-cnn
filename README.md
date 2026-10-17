@@ -178,12 +178,13 @@ python scripts/train.py +experiment=augmented_slow  # aumento geométrico y tasa
 python scripts/train.py +experiment=patient_mean    # pérdida por paciente: media de logits de sus cortes
 python scripts/train.py +experiment=patient_max     # pérdida por paciente: máximo de logits de sus cortes
 python scripts/train.py +experiment=label_smoothing # objetivos 0,05 / 0,95
+python scripts/train.py +experiment=patient_mean_large_batch  # patient_mean con 12 pacientes por lote
 ```
 
 Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente):
 
 ```bash
-python scripts/train.py --experiments augmented_slow patient_mean patient_max label_smoothing
+python scripts/train.py --experiments patient_mean_large_batch patient_max label_smoothing
 ```
 
 Cada época imprime la pérdida y el AUC por paciente de train y validación. Si un entrenamiento se interrumpe, se continúa desde la última época completada:
