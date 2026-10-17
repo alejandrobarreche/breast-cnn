@@ -48,5 +48,11 @@ train:
   max_translation: 0.0
   scale_range: [1.0, 1.0]
   weighted_loss: ???
+  # slice: one BCE term per slice. patient: slice logits pooled per patient
+  # (mean or max) and one BCE term per patient; batches then hold whole patients.
+  loss_unit: slice
+  patient_pooling: mean
+  patients_per_batch: 3  # ~30 slices, close to batch_size
+  label_smoothing: 0.0   # targets y(1 - e) + e/2 during training only
   threshold: 0.5
   runs_dir: runs

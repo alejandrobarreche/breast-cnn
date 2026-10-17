@@ -46,6 +46,10 @@ class TrainConfig(BaseModel):
     max_translation: float = Field(ge=0, lt=1)
     scale_range: list[float] = Field(min_length=2, max_length=2)
     weighted_loss: bool
+    loss_unit: Literal["slice", "patient"]
+    patient_pooling: Literal["mean", "max"]
+    patients_per_batch: int = Field(gt=0)
+    label_smoothing: float = Field(ge=0, lt=0.5)
     threshold: float = Field(gt=0, lt=1)
     runs_dir: str
 

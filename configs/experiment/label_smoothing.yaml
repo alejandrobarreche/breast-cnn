@@ -1,0 +1,6 @@
+# @package _global_
+# Label smoothing 0.1 (training targets 0.05 / 0.95) on top of baseline_weighted.
+train:
+  experiment: label_smoothing
+  weighted_loss: true
+  label_smoothing: 0.1

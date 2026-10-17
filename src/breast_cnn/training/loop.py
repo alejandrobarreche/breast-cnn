@@ -6,6 +6,7 @@ import random
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ def select_device() -> torch.device:
 
 
 def positive_class_weight(labels: pd.Series) -> float:
-    """pos_weight = N0 / N1 over the training slices of the current fold."""
+    """pos_weight = N0 / N1 over the training units (slices or patients) of the current fold."""
     positives = int(labels.eq(1).sum())
     negatives = int(labels.eq(0).sum())
     if positives == 0 or negatives == 0:
@@ -37,12 +38,49 @@ def positive_class_weight(labels: pd.Series) -> float:
     return negatives / positives
 
 
+@dataclass(frozen=True)
+class Objective:
+    """BCEWithLogitsLoss applied per slice, or per patient after pooling slice logits.
+
+    Patient pooling: "mean" averages slice logits (every slice contributes to the
+    gradient); "max" keeps the highest logit (only the most pCR-like slice receives
+    gradient: a patient is predicted pCR as soon as one slice looks like pCR).
+    """
+
+    criterion: nn.BCEWithLogitsLoss
+    unit: Literal["slice", "patient"]
+    pooling: Literal["mean", "max"]
+
+    def __call__(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        patient_ids: list[str],
+        label_smoothing: float = 0.0,
+    ) -> tuple[torch.Tensor, int]:
+        """Return the mean loss and the number of units (slices or patients) it averages."""
+        if self.unit == "patient":
+            codes, _ = pd.factorize(pd.Series(patient_ids))
+            index = torch.as_tensor(codes, device=logits.device)
+            count = int(codes.max()) + 1
+            reduce = "mean" if self.pooling == "mean" else "amax"
+            logits = torch.zeros(count, device=logits.device, dtype=logits.dtype).scatter_reduce(
+                0, index, logits, reduce=reduce, include_self=False
+            )
+            labels = torch.zeros(count, device=labels.device, dtype=labels.dtype).scatter_reduce(
+                0, index, labels, reduce="amax", include_self=False
+            )
+        targets = labels * (1 - label_smoothing) + label_smoothing / 2
+        return self.criterion(logits, targets), labels.numel()
+
+
 def train_one_epoch(
     model: nn.Module,
     loader: DataLoader,
-    criterion: nn.Module,
+    objective: Objective,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
+    label_smoothing: float = 0.0,
 ) -> tuple[float, pd.DataFrame]:
     """One pass of minibatch gradient descent; returns the mean loss and running predictions.
 
@@ -51,15 +89,16 @@ def train_one_epoch(
     pessimistic estimate of the training AUC, as Keras-style training metrics do.
     """
     model.train()
-    total, rows = 0.0, []
+    total, units, rows = 0.0, 0, []
     for batch in loader:
         images, labels = batch["image"].to(device), batch["label"].to(device)
         optimizer.zero_grad(set_to_none=True)
         logits = model(images)
-        loss = criterion(logits, labels)
+        loss, count = objective(logits, labels, batch["patient_id"], label_smoothing)
         loss.backward()
         optimizer.step()
-        total += loss.item() * labels.numel()
+        total += loss.item() * count
+        units += count
         rows.append(
             pd.DataFrame(
                 {
@@ -69,35 +108,35 @@ def train_one_epoch(
                 }
             )
         )
-    predictions = pd.concat(rows, ignore_index=True)
-    return total / len(predictions), predictions
+    return total / units, pd.concat(rows, ignore_index=True)
 
 
 @torch.no_grad()
 def predict(
-    model: nn.Module, loader: DataLoader, criterion: nn.Module, device: torch.device
+    model: nn.Module, loader: DataLoader, objective: Objective, device: torch.device
 ) -> tuple[float, pd.DataFrame]:
-    """Evaluate in eval mode; return the mean loss and one prediction row per slice."""
+    """Evaluate in eval mode; return the loss on hard labels and one row per slice."""
     model.eval()
-    total, rows = 0.0, []
+    logits, labels, rows = [], [], []
     for batch in loader:
-        images, labels = batch["image"].to(device), batch["label"].to(device)
-        logits = model(images)
-        total += criterion(logits, labels).item() * labels.numel()
+        batch_logits = model(batch["image"].to(device))
+        logits.append(batch_logits)
+        labels.append(batch["label"].to(device))
         rows.append(
             pd.DataFrame(
                 {
                     "sample_id": batch["sample_id"],
                     "patient_id": batch["patient_id"],
                     "slice_index": batch["slice_index"].tolist(),
-                    "label": labels.int().tolist(),
-                    "logit": logits.float().cpu().tolist(),
-                    "probability": torch.sigmoid(logits).float().cpu().tolist(),
+                    "label": batch["label"].int().tolist(),
+                    "logit": batch_logits.float().cpu().tolist(),
+                    "probability": torch.sigmoid(batch_logits).float().cpu().tolist(),
                 }
             )
         )
     predictions = pd.concat(rows, ignore_index=True)
-    return total / len(predictions), predictions
+    loss, _ = objective(torch.cat(logits), torch.cat(labels), predictions["patient_id"].tolist())
+    return loss.item(), predictions
 
 
 @dataclass
@@ -158,14 +197,20 @@ def fit_fold(
         affine=RandomAffine(
             config.rotation_degrees, config.max_translation, tuple(config.scale_range)
         ),
+        patients_per_batch=config.patients_per_batch if config.loss_unit == "patient" else None,
     )
     seed_everything(config.seed)
     model = build_model(model_config).to(device)
-    pos_weight = (
-        positive_class_weight(train_loader.dataset.samples["pCR"]) if config.weighted_loss else None
-    )
-    criterion = nn.BCEWithLogitsLoss(
-        pos_weight=None if pos_weight is None else torch.tensor(pos_weight, device=device)
+    training_units = train_loader.dataset.samples
+    if config.loss_unit == "patient":
+        training_units = training_units.drop_duplicates("patient_id")
+    pos_weight = positive_class_weight(training_units["pCR"]) if config.weighted_loss else None
+    objective = Objective(
+        nn.BCEWithLogitsLoss(
+            pos_weight=None if pos_weight is None else torch.tensor(pos_weight, device=device)
+        ),
+        config.loss_unit,
+        config.patient_pooling,
     )
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
@@ -198,10 +243,10 @@ def fit_fold(
         epoch += 1
         start = time.perf_counter()
         train_loss, train_predictions = train_one_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, objective, optimizer, device, config.label_smoothing
         )
         train_auc = evaluate_predictions(train_predictions, config.threshold)["patient"]["auc"]
-        validation_loss, predictions = predict(model, validation_loader, criterion, device)
+        validation_loss, predictions = predict(model, validation_loader, objective, device)
         metrics = evaluate_predictions(predictions, config.threshold)
         patient_auc = metrics["patient"]["auc"]
         row = {

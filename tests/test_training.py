@@ -6,7 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from PIL import Image
+from torch import nn
 
 from breast_cnn.configuration import DataConfig, TrainConfig, load_train_config
 from breast_cnn.training import (
@@ -16,7 +18,7 @@ from breast_cnn.training import (
     resume_experiment,
     run_experiment,
 )
-from breast_cnn.training.loop import positive_class_weight
+from breast_cnn.training.loop import Objective, positive_class_weight
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -117,6 +119,10 @@ def smoke_config(**changes: object) -> tuple[DataConfig, TrainConfig]:
         max_translation=0.05,
         scale_range=[0.9, 1.1],
         weighted_loss=True,
+        loss_unit="slice",
+        patient_pooling="mean",
+        patients_per_batch=2,
+        label_smoothing=0.0,
         threshold=0.5,
         runs_dir="runs",
     )
@@ -162,10 +168,13 @@ def test_run_experiment_writes_complete_run(training_project: Path) -> None:
         run_dir.mkdir()
 
 
+@pytest.mark.parametrize("loss_unit", ["slice", "patient"])
 def test_resume_continues_interrupted_run_identically(
-    training_project: Path, monkeypatch: pytest.MonkeyPatch
+    training_project: Path, monkeypatch: pytest.MonkeyPatch, loss_unit: str
 ) -> None:
-    data, reference_config = smoke_config(runs_dir="reference", early_stopping_patience=5)
+    data, reference_config = smoke_config(
+        runs_dir="reference", early_stopping_patience=5, loss_unit=loss_unit
+    )
     reference = run_experiment(training_project, data, reference_config)
 
     # Interrupt during the second epoch of fold 3, after fold 0 has finished.
@@ -178,7 +187,9 @@ def test_resume_continues_interrupted_run_identically(
         return original_predict(*args, **kwargs)
 
     monkeypatch.setattr(loop, "predict", interrupted_predict)
-    data, config = smoke_config(runs_dir="interrupted", early_stopping_patience=5)
+    data, config = smoke_config(
+        runs_dir="interrupted", early_stopping_patience=5, loss_unit=loss_unit
+    )
     with pytest.raises(KeyboardInterrupt):
         run_experiment(training_project, data, config)
     monkeypatch.setattr(loop, "predict", original_predict)
@@ -193,3 +204,54 @@ def test_resume_continues_interrupted_run_identically(
     pd.testing.assert_frame_equal(resumed, expected)
     with pytest.raises(ValueError, match="never rewritten"):
         resume_experiment(training_project, run_dir)
+
+
+def test_patient_objective_pools_slice_logits_per_patient() -> None:
+    logits = torch.tensor([0.0, 2.0, -1.0, 4.0])
+    labels = torch.tensor([1.0, 1.0, 0.0, 0.0])
+    patients = ["a", "a", "b", "b"]
+    bce = nn.BCEWithLogitsLoss()
+    mean_loss, count = Objective(bce, "patient", "mean")(logits, labels, patients)
+    assert count == 2
+    torch.testing.assert_close(mean_loss, bce(torch.tensor([1.0, 1.5]), torch.tensor([1.0, 0.0])))
+    max_loss, _ = Objective(bce, "patient", "max")(logits, labels, patients)
+    torch.testing.assert_close(max_loss, bce(torch.tensor([2.0, 4.0]), torch.tensor([1.0, 0.0])))
+    slice_loss, count = Objective(bce, "slice", "mean")(logits, labels, patients, 0.1)
+    assert count == 4
+    torch.testing.assert_close(slice_loss, bce(logits, torch.tensor([0.95, 0.95, 0.05, 0.05])))
+
+
+def test_max_pooling_sends_gradient_only_to_the_highest_slice() -> None:
+    logits = torch.tensor([0.0, 2.0, 1.0], requires_grad=True)
+    loss, _ = Objective(nn.BCEWithLogitsLoss(), "patient", "max")(
+        logits, torch.tensor([1.0, 1.0, 1.0]), ["a", "a", "a"]
+    )
+    loss.backward()
+    assert logits.grad[0] == 0 and logits.grad[2] == 0 and logits.grad[1] != 0
+
+
+def test_patient_batch_sampler_keeps_patients_whole() -> None:
+    from breast_cnn.data.loaders import PatientBatchSampler
+
+    patients = ["a", "a", "b", "c", "c", "c", "d"]
+    sampler = PatientBatchSampler(patients, 2, torch.Generator().manual_seed(0))
+    batches = list(sampler)
+    assert len(batches) == len(sampler) == 2
+    assert sorted(i for batch in batches for i in batch) == list(range(7))
+    for batch in batches:
+        ids = {patients[i] for i in batch}
+        assert len(ids) <= 2
+        assert all(patients.count(p) == sum(patients[i] == p for i in batch) for p in ids)
+    again = list(PatientBatchSampler(patients, 2, torch.Generator().manual_seed(0)))
+    assert again == batches
+
+
+@pytest.mark.parametrize("pooling", ["mean", "max"])
+def test_patient_level_run_completes(training_project: Path, pooling: str) -> None:
+    data, config = smoke_config(
+        loss_unit="patient", patient_pooling=pooling, label_smoothing=0.1, runs_dir=pooling
+    )
+    run_dir = run_experiment(training_project, data, config)
+    metrics = json.loads((run_dir / "metrics.json").read_text())
+    assert metrics["folds"][0]["pos_weight"] == 1.0
+    assert pd.read_csv(run_dir / "history.csv")["train_loss"].notna().all()

@@ -1,0 +1,8 @@
+# @package _global_
+# Patient-level BCE on the maximum slice logit (a patient is pCR if one slice looks pCR),
+# on top of baseline_weighted. pos_weight = N0 / N1 counted over training patients.
+train:
+  experiment: patient_max
+  weighted_loss: true
+  loss_unit: patient
+  patient_pooling: max
