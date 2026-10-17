@@ -1,0 +1,7 @@
+# @package _global_
+# Lower learning rate and stronger decoupled weight decay on top of baseline_weighted.
+train:
+  experiment: regularized
+  weighted_loss: true
+  learning_rate: 0.0003
+  weight_decay: 0.01

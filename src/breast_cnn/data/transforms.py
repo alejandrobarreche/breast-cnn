@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 
 PHASES = ("PRE", "EARLY", "LATE")
@@ -56,4 +58,60 @@ class RandomHorizontalFlip:
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         if self.probability > 0 and torch.rand(()).item() < self.probability:
             return image.flip(-1)
+        return image
+
+
+@dataclass(frozen=True)
+class RandomAffine:
+    """Random rotation, translation and isotropic scaling with one grid for all phases.
+
+    A single sampling grid keeps PRE, EARLY and LATE aligned, so `EARLY − PRE` remains
+    a pixel-wise enhancement map. Bilinear interpolation; uncovered pixels become 0.
+    The identity configuration returns the input unchanged.
+    """
+
+    rotation_degrees: float = 0.0
+    max_translation: float = 0.0
+    scale_range: tuple[float, float] = (1.0, 1.0)
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.rotation_degrees <= 180.0:
+            raise ValueError("rotation_degrees must be in [0,180]")
+        if not 0.0 <= self.max_translation < 1.0:
+            raise ValueError("max_translation must be a fraction in [0,1)")
+        low, high = self.scale_range
+        if not 0.0 < low <= high:
+            raise ValueError("scale_range must satisfy 0 < low <= high")
+
+    @property
+    def is_identity(self) -> bool:
+        return (
+            self.rotation_degrees == 0
+            and self.max_translation == 0
+            and self.scale_range == (1.0, 1.0)
+        )
+
+    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        if self.is_identity:
+            return image
+        angle = math.radians((torch.rand(()).item() * 2 - 1) * self.rotation_degrees)
+        low, high = self.scale_range
+        scale = low + torch.rand(()).item() * (high - low)
+        # affine_grid maps output to input coordinates in [-1, 1]; a shift of 2·t is t of the width.
+        tx, ty = ((torch.rand(2) * 2 - 1) * 2 * self.max_translation).tolist()
+        cos, sin = math.cos(angle) / scale, math.sin(angle) / scale
+        theta = torch.tensor([[cos, -sin, tx], [sin, cos, ty]], dtype=image.dtype)
+        grid = F.affine_grid(theta[None], [1, *image.shape], align_corners=False)
+        return F.grid_sample(
+            image[None], grid, mode="bilinear", padding_mode="zeros", align_corners=False
+        )[0]
+
+
+@dataclass(frozen=True)
+class Compose:
+    transforms: tuple
+
+    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        for transform in self.transforms:
+            image = transform(image)
         return image

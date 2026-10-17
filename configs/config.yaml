@@ -44,6 +44,9 @@ train:
   learning_rate: 0.001
   weight_decay: 0.0001
   horizontal_flip_probability: 0.5
+  rotation_degrees: 0.0
+  max_translation: 0.0
+  scale_range: [1.0, 1.0]
   weighted_loss: ???
   threshold: 0.5
   runs_dir: runs

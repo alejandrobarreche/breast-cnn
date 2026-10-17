@@ -1,0 +1,6 @@
+# @package _global_
+# Depthwise separable convolutions after stage 1 on top of baseline_weighted.
+train:
+  experiment: separable
+  weighted_loss: true
+  model: configs/model/separable.yaml

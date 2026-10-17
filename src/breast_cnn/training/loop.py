@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from breast_cnn.configuration import DataConfig, TrainConfig
 from breast_cnn.data.loaders import create_data_loaders, seed_everything
+from breast_cnn.data.transforms import RandomAffine
 from breast_cnn.models import build_model, load_model_config
 from breast_cnn.training.metrics import evaluate_predictions
 
@@ -113,6 +114,9 @@ def fit_fold(
         num_workers=config.num_workers,
         path_aliases=data.image_path_aliases,
         horizontal_flip_probability=config.horizontal_flip_probability,
+        affine=RandomAffine(
+            config.rotation_degrees, config.max_translation, tuple(config.scale_range)
+        ),
     )
     seed_everything(config.seed)
     model = build_model(load_model_config(root / config.model)).to(device)

@@ -13,7 +13,7 @@ from breast_cnn.configuration import PipelineConfig, load_phase_one_config
 from breast_cnn.data.dataset import BreastDCEDataset
 from breast_cnn.data.loaders import create_data_loaders
 from breast_cnn.data.metadata import load_samples, summarize_folds
-from breast_cnn.data.transforms import RandomHorizontalFlip, load_dce_triplet
+from breast_cnn.data.transforms import RandomAffine, RandomHorizontalFlip, load_dce_triplet
 from breast_cnn.data.validation import validate_sample_frame
 
 
@@ -235,3 +235,22 @@ def test_invalid_configuration_fails_before_loading() -> None:
             horizontal_flip_probability=0.0,
             report_path="unused.json",
         )
+
+
+def test_random_affine_uses_one_grid_for_all_phases() -> None:
+    torch.manual_seed(0)
+    base = torch.rand(1, 256, 256)
+    image = torch.cat([base, 0.5 * base, 0.25 * base])
+    affine = RandomAffine(rotation_degrees=15, max_translation=0.1, scale_range=(0.9, 1.1))
+    output = affine(image)
+    assert output.shape == image.shape
+    assert not torch.equal(output, image)
+    torch.testing.assert_close(output[1], 0.5 * output[0])
+    torch.testing.assert_close(output[2], 0.25 * output[0])
+    assert torch.equal(RandomAffine()(image), image)
+
+
+def test_affine_augmentation_is_rejected_outside_training(dataset_project: Path) -> None:
+    samples = load_samples(dataset_project).iloc[[0]]
+    with pytest.raises(ValueError, match="Augmentation is forbidden"):
+        BreastDCEDataset(samples, dataset_project, affine=RandomAffine(rotation_degrees=10))

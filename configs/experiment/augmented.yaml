@@ -1,0 +1,8 @@
+# @package _global_
+# Joint geometric augmentation (rotation, translation, scale) on top of baseline_weighted.
+train:
+  experiment: augmented
+  weighted_loss: true
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]

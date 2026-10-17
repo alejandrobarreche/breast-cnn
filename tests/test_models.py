@@ -38,6 +38,15 @@ def test_parameter_count_matches_hand_calculation() -> None:
     assert sum(p.numel() for p in model.parameters()) == convs + batch_norms + linear
 
 
+def test_separable_stage_uses_depthwise_and_pointwise_convolutions() -> None:
+    stages = [{"channels": 4, "convs": 1}, {"channels": 8, "convs": 1, "conv": "separable"}]
+    model = build_model(ModelConfig.model_validate(small_config(stages=stages)))
+    convs = 9 * 3 * 4 + (9 * 4 + 4 * 8)  # standard, then depthwise + pointwise
+    batch_norms = 2 * (4 + 8)
+    assert sum(p.numel() for p in model.parameters()) == convs + batch_norms + 8 + 1
+    assert model.eval()(torch.rand(2, 3, 32, 32)).shape == (2,)
+
+
 def test_summary_tracks_shapes_and_parameters() -> None:
     model = build_model(ModelConfig.model_validate(small_config()))
     rows = summarize_model(model, (3, 32, 32))
@@ -71,6 +80,7 @@ def test_initialization_is_he_for_convolutions_and_zero_bias_for_output() -> Non
     "changes",
     [
         {"activation": "selu"},
+        {"stages": [{"channels": 4, "convs": 1, "conv": "dilated"}]},
         {"stages": []},
         {"stages": [{"channels": 0, "convs": 1}]},
         {"kernel_size": 4},

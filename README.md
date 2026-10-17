@@ -171,6 +171,9 @@ Entrenamiento (validación cruzada con los 5 `fold` de `train`; un experimento p
 ```bash
 python scripts/train.py +experiment=baseline_unweighted
 python scripts/train.py +experiment=baseline_weighted
+python scripts/train.py +experiment=augmented     # aumento geométrico conjunto
+python scripts/train.py +experiment=regularized   # tasa de aprendizaje 3e-4, decaimiento 1e-2
+python scripts/train.py +experiment=separable     # convoluciones separables en profundidad
 ```
 
 Tests y estilo:

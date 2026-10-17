@@ -42,6 +42,9 @@ class TrainConfig(BaseModel):
     learning_rate: float = Field(gt=0)
     weight_decay: float = Field(ge=0)
     horizontal_flip_probability: float = Field(ge=0, le=1)
+    rotation_degrees: float = Field(ge=0, le=180)
+    max_translation: float = Field(ge=0, lt=1)
+    scale_range: list[float] = Field(min_length=2, max_length=2)
     weighted_loss: bool
     threshold: float = Field(gt=0, lt=1)
     runs_dir: str

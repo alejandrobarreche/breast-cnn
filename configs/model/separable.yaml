@@ -1,0 +1,14 @@
+# Baseline widths with depthwise separable convolutions (Chollet, 2017) after stage 1.
+# Input [3, 256, 256] with channels PRE, EARLY, LATE (early fusion of the DCE phases).
+# Stage 1 keeps standard convolutions: with 3 input channels a depthwise filter per channel
+# would mix phases only in the pointwise step. Same head as baseline.
+in_channels: 3
+kernel_size: 3
+activation: relu  # relu | leaky_relu | elu | gelu
+stages:
+  - {channels: 8, convs: 2, conv: standard}
+  - {channels: 16, convs: 2, conv: separable}
+  - {channels: 32, convs: 2, conv: separable}
+  - {channels: 64, convs: 2, conv: separable}
+  - {channels: 128, convs: 2, conv: separable}
+dropout: 0.3

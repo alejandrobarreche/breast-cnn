@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from breast_cnn.data.dataset import BreastDCEDataset
 from breast_cnn.data.metadata import split_train_validation
+from breast_cnn.data.transforms import RandomAffine
 from breast_cnn.data.validation import validate_sample_frame
 
 
@@ -40,6 +41,7 @@ def create_data_loaders(
     num_workers: int = 0,
     path_aliases: Mapping[str, str] | None = None,
     horizontal_flip_probability: float = 0.0,
+    affine: RandomAffine | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Validate the index, seed RNGs and return training/validation loaders.
 
@@ -63,6 +65,7 @@ def create_data_loaders(
         path_aliases=path_aliases,
         training=True,
         horizontal_flip_probability=horizontal_flip_probability,
+        affine=affine,
     )
     validation_dataset = BreastDCEDataset(validation, project_root, path_aliases=path_aliases)
     seed_everything(seed)

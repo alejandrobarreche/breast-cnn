@@ -25,6 +25,8 @@ class StageConfig(BaseModel):
 
     channels: int = Field(gt=0)
     convs: int = Field(gt=0)
+    # "separable": depthwise k x k per channel followed by a pointwise 1 x 1 convolution.
+    conv: Literal["standard", "separable"] = "standard"
 
 
 class ModelConfig(BaseModel):
@@ -65,15 +67,27 @@ def build_model(config: ModelConfig) -> CNN:
     in_channels = config.in_channels
     for stage in config.stages:
         for _ in range(stage.convs):
+            # BatchNorm supplies the shift, so the convolution bias would be redundant.
+            padding = config.kernel_size // 2
+            if stage.conv == "separable":
+                layers += [
+                    nn.Conv2d(
+                        in_channels,
+                        in_channels,
+                        config.kernel_size,
+                        padding=padding,
+                        groups=in_channels,
+                        bias=False,
+                    ),
+                    nn.Conv2d(in_channels, stage.channels, 1, bias=False),
+                ]
+            else:
+                layers.append(
+                    nn.Conv2d(
+                        in_channels, stage.channels, config.kernel_size, padding=padding, bias=False
+                    )
+                )
             layers += [
-                # BatchNorm supplies the shift, so the convolution bias would be redundant.
-                nn.Conv2d(
-                    in_channels,
-                    stage.channels,
-                    config.kernel_size,
-                    padding=config.kernel_size // 2,
-                    bias=False,
-                ),
                 nn.BatchNorm2d(stage.channels),
                 _ACTIVATIONS[config.activation](),
             ]
