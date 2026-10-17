@@ -1,0 +1,54 @@
+data:
+  metadata_dir: metadata
+  image_path_aliases:
+    dataset: data
+  expected_image_size:
+  - 256
+  - 256
+train:
+  experiment: augmented
+  model: configs/model/baseline.yaml
+  folds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  seed: 2026
+  epochs: 40
+  early_stopping_patience: 8
+  batch_size: 32
+  num_workers: 4
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  horizontal_flip_probability: 0.5
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range:
+  - 0.9
+  - 1.1
+  weighted_loss: true
+  threshold: 0.5
+  runs_dir: runs
+model:
+  in_channels: 3
+  kernel_size: 3
+  activation: relu
+  stages:
+  - channels: 8
+    convs: 2
+    conv: standard
+  - channels: 16
+    convs: 2
+    conv: standard
+  - channels: 32
+    convs: 2
+    conv: standard
+  - channels: 64
+    convs: 2
+    conv: standard
+  - channels: 128
+    convs: 2
+    conv: standard
+  dropout: 0.3
