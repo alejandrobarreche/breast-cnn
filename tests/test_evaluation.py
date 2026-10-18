@@ -11,9 +11,11 @@ from breast_cnn.evaluation import (
     calibrate_and_threshold,
     cohort_baseline,
     epoch_selection,
+    evaluate_test,
     fit_platt,
     fold_auc,
     paired_differences,
+    patient_test_scores,
     specificity_threshold,
 )
 from breast_cnn.evaluation.bootstrap import _weighted_auc
@@ -123,3 +125,50 @@ def test_calibration_report_uses_each_fold_and_one_threshold() -> None:
     for fold in report["folds"].values():
         assert fold["mean_calibrated_probability"] == pytest.approx(fold["pcr_rate"], abs=1e-3)
     assert report["pooled_validation"]["specificity"] >= 0.9
+
+
+def test_test_evaluation_on_synthetic_patients() -> None:
+    rng = np.random.default_rng(2)
+    calibration = {
+        "threshold": 0.3,
+        "folds": {
+            "0": {"slope": 1.0, "intercept": 0.0},
+            "1": {"slope": 0.0, "intercept": -1.0},  # constant model
+        },
+    }
+    rows = []
+    for patient in range(80):
+        label = int(patient < 30)
+        for _ in range(3):
+            rows.append(
+                {
+                    "patient_id": f"p{patient:02d}",
+                    "label": label,
+                    "probability_fold0": float(
+                        np.clip(0.3 + 0.2 * label + rng.normal(0, 0.1), 0.01, 0.99)
+                    ),
+                    "probability_fold1": float(rng.uniform(0.2, 0.8)),
+                }
+            )
+    slices = pd.DataFrame(rows)
+    patients = patient_test_scores(slices, calibration)
+    expected_raw = slices.groupby("patient_id")[["probability_fold0", "probability_fold1"]].mean()
+    assert patients["raw"].tolist() == pytest.approx(expected_raw.mean(axis=1).tolist())
+    calibrated_one = 1 / (1 + np.exp(1.0))
+    expected = (expected_raw["probability_fold0"] + calibrated_one) / 2
+    assert patients["calibrated"].tolist() == pytest.approx(expected.tolist())
+
+    cohorts = pd.Series(np.where(np.arange(80) % 2, "a", "b"), index=patients.index)
+    train = pd.DataFrame({"data": ["a", "a", "b", "b"], "pCR": [1, 0, 0, 0]})
+    report = evaluate_test(patients, cohorts, train, calibration, 200, 0.95, 0)
+    assert report["patients"] == 80 and report["positives"] == 30
+    assert report["auc"]["lower"] <= report["auc"]["value"] <= report["auc"]["upper"]
+    assert report["auc"]["value"] == pytest.approx(
+        roc_auc_score(patients["label"], patients["raw"])
+    )
+    assert report["cohort_baseline"]["train_pcr_rate"] == {"a": 0.5, "b": 0.0}
+    assert report["always_no_pcr"]["sensitivity"] == 0.0
+    assert report["always_no_pcr"]["accuracy"] == pytest.approx(50 / 80)
+    counts = report["at_threshold"]
+    assert counts["true_positives"] + counts["false_negatives"] == 30
+    assert set(report["by_cohort"]) == {"a", "b"}

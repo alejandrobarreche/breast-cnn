@@ -8,6 +8,7 @@ from breast_cnn.evaluation.calibration import (
     specificity_threshold,
 )
 from breast_cnn.evaluation.ensemble import load_fold_models, predict_ensemble
+from breast_cnn.evaluation.final import evaluate_test, patient_test_scores
 from breast_cnn.evaluation.runs import (
     Run,
     cohort_auc,
@@ -27,12 +28,14 @@ __all__ = [
     "cohort_auc",
     "cohort_baseline",
     "epoch_selection",
+    "evaluate_test",
     "fit_platt",
     "fold_auc",
     "load_fold_models",
     "load_runs",
     "paired_differences",
     "patient_scores",
+    "patient_test_scores",
     "predict_ensemble",
     "selection_summary",
     "specificity_threshold",

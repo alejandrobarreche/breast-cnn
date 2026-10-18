@@ -79,6 +79,8 @@ class AnalysisConfig(BaseModel):
     final_run: str
     min_specificity: float = Field(gt=0, lt=1)
     calibration_report_path: str
+    test_report_path: str
+    test_predictions_path: str
 
 
 class DataConfig(BaseModel):

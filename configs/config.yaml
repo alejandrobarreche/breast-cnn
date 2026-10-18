@@ -76,3 +76,6 @@ analysis:
   final_run: runs/20261018-1330_wide_crop128_fixed
   min_specificity: 0.9
   calibration_report_path: artifacts/metrics/calibration_validation_patient.json
+  # Single test evaluation (scripts/evaluate_test.py); existing outputs are never overwritten.
+  test_report_path: artifacts/metrics/test_evaluation_patient.json
+  test_predictions_path: artifacts/metrics/predictions_test_slice.csv
