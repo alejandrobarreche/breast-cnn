@@ -1,0 +1,104 @@
+{
+  "run": "runs/20261018-1330_wide_crop128_fixed",
+  "calibration_report": "artifacts/metrics/calibration_validation_patient.json",
+  "unit": "patient",
+  "patients": 176,
+  "positives": 53,
+  "threshold": 0.34786299939700405,
+  "confidence_level": 0.95,
+  "bootstrap_resamples": 10000,
+  "auc": {
+    "value": 0.5905813775118883,
+    "lower": 0.5080495474766069,
+    "upper": 0.6726491793219819
+  },
+  "at_threshold": {
+    "n": 176,
+    "positives": 53,
+    "auc": 0.5769289768369382,
+    "sensitivity": 0.0,
+    "specificity": 0.983739837398374,
+    "balanced_accuracy": 0.491869918699187,
+    "true_positives": 0,
+    "false_negatives": 53,
+    "true_negatives": 121,
+    "false_positives": 2,
+    "accuracy": 0.6875
+  },
+  "cohort_baseline": {
+    "auc": 0.5440251572327044,
+    "train_pcr_rate": {
+      "duke": 0.21052631578947367,
+      "spy1": 0.25,
+      "spy2": 0.32142857142857145
+    },
+    "auc_difference": {
+      "value": 0.046556220279183935,
+      "lower": -0.03597560975609747,
+      "upper": 0.12862402208927748,
+      "p_not_better": 0.132
+    }
+  },
+  "always_no_pcr": {
+    "n": 176,
+    "positives": 53,
+    "auc": 0.5,
+    "sensitivity": 0.0,
+    "specificity": 1.0,
+    "balanced_accuracy": 0.5,
+    "true_positives": 0,
+    "false_negatives": 53,
+    "true_negatives": 123,
+    "false_positives": 0,
+    "accuracy": 0.6988636363636364
+  },
+  "fold_models_auc": {
+    "fold0": 0.574474612670655,
+    "fold1": 0.5537659150176408,
+    "fold2": 0.5341310016873754,
+    "fold3": 0.6033133916244824,
+    "fold4": 0.567878508973769
+  },
+  "by_cohort": {
+    "duke": {
+      "auc": 0.5084175084175084,
+      "n": 42,
+      "positives": 9,
+      "sensitivity": 0.0,
+      "specificity": 1.0,
+      "balanced_accuracy": 0.5,
+      "true_positives": 0,
+      "false_negatives": 9,
+      "true_negatives": 33,
+      "false_positives": 0,
+      "accuracy": 0.7857142857142857
+    },
+    "spy1": {
+      "auc": 0.4275362318840579,
+      "n": 35,
+      "positives": 12,
+      "sensitivity": 0.0,
+      "specificity": 0.9565217391304348,
+      "balanced_accuracy": 0.4782608695652174,
+      "true_positives": 0,
+      "false_negatives": 12,
+      "true_negatives": 22,
+      "false_positives": 1,
+      "accuracy": 0.6285714285714286
+    },
+    "spy2": {
+      "auc": 0.6781716417910447,
+      "n": 99,
+      "positives": 32,
+      "sensitivity": 0.0,
+      "specificity": 0.9850746268656716,
+      "balanced_accuracy": 0.4925373134328358,
+      "true_positives": 0,
+      "false_negatives": 32,
+      "true_negatives": 66,
+      "false_positives": 1,
+      "accuracy": 0.6666666666666666
+    }
+  },
+  "mean_calibrated_probability": 0.29020565762777
+}
