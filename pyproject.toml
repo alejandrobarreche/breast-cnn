@@ -71,9 +71,10 @@ mlflow = ">=2.10"
 optional = true
 
 [tool.poetry.group.web.dependencies]
-fastapi = ">=0.110"
-python-multipart = ">=0.0.9"
-uvicorn = ">=0.27"
+# Export of the final ensemble to ONNX for in-browser inference, and its parity check.
+onnx = ">=1.17"
+onnxruntime = ">=1.20"
+onnxscript = ">=0.2"
 
 
 # ---------------------------------------------------------------------------

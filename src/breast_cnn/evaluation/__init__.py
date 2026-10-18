@@ -7,7 +7,11 @@ from breast_cnn.evaluation.calibration import (
     fit_platt,
     specificity_threshold,
 )
-from breast_cnn.evaluation.ensemble import load_fold_models, predict_ensemble
+from breast_cnn.evaluation.ensemble import (
+    CalibratedEnsemble,
+    load_fold_models,
+    predict_ensemble,
+)
 from breast_cnn.evaluation.final import evaluate_test, patient_test_scores
 from breast_cnn.evaluation.runs import (
     Run,
@@ -21,6 +25,7 @@ from breast_cnn.evaluation.runs import (
 )
 
 __all__ = [
+    "CalibratedEnsemble",
     "Run",
     "apply_platt",
     "bootstrap_auc",
