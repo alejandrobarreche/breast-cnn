@@ -40,11 +40,17 @@ function enhancementColour(value: number): number[] {
   return a.map((c, k) => Math.round(c + (b[k] - c) * u));
 }
 function imageData(pixels: Uint8ClampedArray) { return new ImageData(new Uint8ClampedArray(pixels), SIZE, SIZE); }
+// EARLY − PRE over the PRE phase: the colour of ENHANCEMENT_CMAP, with an opacity that grows
+// with |EARLY − PRE| and is full from a difference of FULL_AT. Pixels that do not change keep PRE.
+const FULL_AT = 0.25;
 function enhancement(pre: Uint8ClampedArray, early: Uint8ClampedArray) {
   const out = new ImageData(SIZE, SIZE);
   for (let p = 0; p < SIZE * SIZE * 4; p += 4) {
-    const [r, g, b] = enhancementColour((early[p] - pre[p]) / 255);
-    out.data[p] = r; out.data[p + 1] = g; out.data[p + 2] = b; out.data[p + 3] = 255;
+    const value = (early[p] - pre[p]) / 255;
+    const colour = enhancementColour(value);
+    const alpha = Math.min(1, Math.abs(value) / FULL_AT);
+    for (let c = 0; c < 3; c++) out.data[p + c] = Math.round(pre[p] * (1 - alpha) + colour[c] * alpha);
+    out.data[p + 3] = 255;
   }
   return out;
 }
@@ -76,22 +82,33 @@ function drawPhases(errors: Partial<Record<string, string>> = {}) {
 function showResult(prediction: Prediction | null, animate = true) {
   ruler.set(prediction?.foldCalibrated ?? null, prediction?.calibrated ?? null, animate);
   network.setOutputs(prediction?.foldCalibrated ?? null, prediction?.calibrated ?? null);
-  const pill = $("pill");
+  const pill = $("pill"), prob = $("prob");
   if (!prediction) {
-    $("prob").innerHTML = "—<small>%</small>";
+    prob.className = "prob idle";
+    prob.textContent = state.pixels ? "Pulsa Predecir" : "Carga un corte";
     pill.className = "pill idle";
     pill.textContent = state.pixels ? "Lista" : "Sin muestra";
+    $("reading").textContent = "";
     $("f-spread").textContent = "—";
     $("f-time").textContent = "—";
     $("revealed").textContent = "";
     return;
   }
   const positive = prediction.calibrated >= THRESHOLD;
-  $("prob").innerHTML = `${percent(prediction.calibrated)}<small>%</small>`;
+  prob.className = "prob";
+  prob.innerHTML = `${percent(prediction.calibrated)}<small>%</small>`;
   pill.className = `pill ${positive ? "pos" : "neg"}`;
   pill.textContent = positive ? "pCR" : "Sin pCR";
   const f = prediction.foldCalibrated;
-  $("f-spread").textContent = `${percent(Math.min(...f))} – ${percent(Math.max(...f))} %`;
+  const low = Math.min(...f), high = Math.max(...f);
+  const split = low < THRESHOLD && high >= THRESHOLD;
+  $("reading").textContent =
+    `El modelo estima una probabilidad de pCR del ${percent(prediction.calibrated)} %, ` +
+    `${positive ? "igual o superior" : "inferior"} al umbral de ${percent(THRESHOLD)} %. ` +
+    (split
+      ? `Los cinco modelos no coinciden en la clase (${percent(low)} – ${percent(high)} %): la estimación es incierta.`
+      : `Los cinco modelos coinciden en la clase (${percent(low)} – ${percent(high)} %).`);
+  $("f-spread").textContent = `${percent(low)} – ${percent(high)} %`;
   $("f-time").textContent = `WASM · ${Math.max(1, Math.round(prediction.milliseconds))} ms`;
 }
 
@@ -115,6 +132,9 @@ function renderLog() {
     rows.appendChild(li);
   }
   $("log-count").textContent = `${Math.min(5, state.log.length)} / 5`;
+  const revealed = state.log.filter((e) => e.label != null);
+  const hits = revealed.filter((e) => (e.label === 1) === e.positive).length;
+  $("log-summary").textContent = revealed.length ? `${hits} aciertos de ${revealed.length} revelados` : "Sin etiquetas reveladas";
 }
 
 function updateButtons() {
@@ -181,7 +201,7 @@ function openSheet(name: string) {
     if (on) {
       // the sheet grows out of the button that opened it
       const box = button.getBoundingClientRect();
-      sheet.style.transformOrigin = `${box.left + box.width / 2 - (innerWidth / 2 - sheet.offsetWidth / 2)}px 100%`;
+      sheet.style.transformOrigin = `${box.left + box.width / 2 - (innerWidth / 2 - sheet.offsetWidth / 2)}px 0%`;
     }
     sheet.classList.toggle("open", on);
   }

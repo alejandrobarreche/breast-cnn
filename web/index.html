@@ -19,7 +19,7 @@
         <section class="card hero" aria-labelledby="net-title">
           <div class="card-head">
             <span class="label">Fig. 1</span>
-            <span class="label" id="net-title">CNN 2D · 5 modelos · probabilidad calibrada</span>
+            <span class="title" id="net-title">CNN 2D · 5 modelos · probabilidad calibrada</span>
           </div>
           <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
           <div class="card-foot">
@@ -29,15 +29,25 @@
         </section>
 
         <section class="card phases" aria-labelledby="ph-title">
-          <div class="card-head"><span class="label">Fig. 2</span><span class="label" id="ph-title">Fases DCE</span></div>
+          <div class="card-head"><span class="label">Fig. 2</span><span class="title" id="ph-title">Fases DCE</span></div>
           <div class="quad" id="quad"></div>
+          <div class="legend" aria-label="Escala del mapa de realce">
+            <div class="ramp"></div>
+            <div class="ticks"><span>−1</span><span>0</span><span>+1</span></div>
+          </div>
+          <p class="explain">PRE se adquiere antes de inyectar el contraste; EARLY y LATE, poco después y más tarde. El mapa colorea sobre PRE la diferencia EARLY − PRE: donde la señal aumenta y donde disminuye. El tejido tumoral suele captar contraste pronto, por eso este mapa ayuda a localizarlo.</p>
+          <div class="card-foot">
+            <span class="hint">Tres PNG: <code>_PRE</code>, <code>_EARLY</code> y <code>_LATE</code>. También se pueden arrastrar a la página.</span>
+            <label class="btn" for="files">Cargar corte</label>
+          </div>
         </section>
 
         <section class="card result" aria-labelledby="res-title">
-          <div class="card-head"><span class="label">Fig. 3</span><span class="label" id="res-title">Probabilidad de pCR</span></div>
+          <div class="card-head"><span class="label">Fig. 3</span><span class="title" id="res-title">Probabilidad de pCR</span></div>
           <div aria-live="polite">
-            <div class="prob" id="prob">—<small>%</small></div>
+            <div class="prob idle" id="prob">Pulsa Predecir</div>
             <div class="verdict"><span class="pill idle" id="pill">Sin muestra</span><span class="label" id="revealed"></span></div>
+            <p class="reading" id="reading"></p>
           </div>
           <svg id="ruler" viewBox="0 0 400 136" role="img" aria-label="Regla de 0 a 60 por ciento con el umbral, la proporción de pCR en train y los cinco modelos"></svg>
           <dl class="facts">
@@ -50,16 +60,17 @@
             <button class="btn" id="reveal" disabled>Revelar</button>
             <button class="btn" id="clear" disabled>Limpiar</button>
           </div>
+          <p class="notice"><b>Uso educativo, sin validez clínica.</b> Es una estimación sobre un único corte, no un diagnóstico: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.</p>
         </section>
 
         <section class="card log" aria-labelledby="log-title">
-          <div class="card-head"><span class="label" id="log-title">Registro</span><span class="label" id="log-count">0 / 5</span></div>
+          <div class="card-head"><span class="title" id="log-title">Registro de la defensa</span><span class="label" id="log-count">0 / 5</span></div>
           <ol class="rows" id="rows"></ol>
-          <div class="card-foot"><button class="btn full" id="copy-csv">Copiar CSV</button></div>
+          <div class="card-foot"><span class="label" id="log-summary">Sin etiquetas reveladas</span><button class="btn full" id="copy-csv">Copiar CSV</button></div>
         </section>
       </main>
 
-      <p class="foot">Uso educativo, sin validez clínica · imágenes BreastDCEDL, CC BY-NC 4.0</p>
+      <p class="foot">Imágenes BreastDCEDL, CC BY-NC 4.0 · CNN 2D entrenada desde cero</p>
     </div>
 
     <nav class="dock" aria-label="Acciones">

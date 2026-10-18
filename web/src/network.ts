@@ -28,7 +28,7 @@ export function drawNetwork(
   onStage: (label: string | null) => void,
 ): Network {
   svg.replaceChildren();
-  const tones = [token("--t2"), token("--t3"), token("--t1")];
+  const tones = [token("--t3"), token("--t4"), token("--t2")];
   const stroke = { stroke: "rgba(0,0,0,.6)", "stroke-width": 0.8, "stroke-linejoin": "round" };
   const g = el("g", {}, svg);
   const clip = el("clipPath", { id: "crop-clip" }, el("defs", {}, svg));
@@ -42,7 +42,7 @@ export function drawNetwork(
   };
   const caption = (cx: number, first: string, second: string) => {
     text(g, cx, AXIS + 112, first, { "text-anchor": "middle", fill: token("--ink"), "font-size": 16 });
-    text(g, cx, AXIS + 134, second, { "text-anchor": "middle", "font-size": 13, fill: token("--t4") });
+    text(g, cx, AXIS + 134, second, { "text-anchor": "middle", "font-size": 14, fill: token("--muted") });
   };
   const link = (x0: number, x1: number) => {
     el("line", { x1: x0, y1: AXIS, x2: x1, y2: AXIS, stroke: token("--t4"), "stroke-width": 1 }, g);
