@@ -136,7 +136,9 @@ def _train(
             "experiment": config.experiment,
             "scope": "internal_validation_folds",
             "aggregation": "mean_probability_per_patient",
-            "selection": "best_validation_patient_auc",
+            "selection": {"best": "best_validation_patient_auc", "last": "last_epoch"}[
+                config.epoch_selection
+            ],
             "summary": _summary(fold_metrics),
             "folds": fold_metrics,
         },
@@ -153,7 +155,8 @@ def _train(
         },
         run_dir / "environment.json",
     )
-    figure = plot_learning_curves(history, config.experiment)
+    selected = {m["fold"]: m["best_epoch"] for m in fold_metrics}
+    figure = plot_learning_curves(history, config.experiment, selected)
     save_figure(figure, run_dir / "figures" / "learning_curves_validation.png")
     plt.close(figure)
     return run_dir

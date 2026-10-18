@@ -249,11 +249,10 @@ def plot_dce_phases(image: torch.Tensor, *, sample_id: str, cohort: str, label: 
     return figure
 
 
-def plot_learning_curves(history: pd.DataFrame, experiment: str) -> Figure:
-    """Training and validation curves together, one line per fold; dot = selected epoch.
-
-    The selected epoch is the first maximum of the validation patient AUC, as in training.
-    """
+def plot_learning_curves(
+    history: pd.DataFrame, experiment: str, selected_epochs: dict[int, int]
+) -> Figure:
+    """Training and validation curves together, one line per fold; dot = selected epoch."""
     with plt.rc_context(STYLE):
         figure, (loss_axis, auc_axis) = plt.subplots(1, 2, figsize=(11, 4.2), layout="constrained")
         set_chart_title(
@@ -268,8 +267,8 @@ def plot_learning_curves(history: pd.DataFrame, experiment: str) -> Figure:
             (loss_axis, "train_loss", "validation_loss"),
             (auc_axis, "train_patient_auc", "validation_patient_auc"),
         )
-        for _, rows in history.groupby("fold"):
-            selected = rows.loc[rows["validation_patient_auc"].idxmax()]
+        for fold, rows in history.groupby("fold"):
+            selected = rows.loc[rows["epoch"].eq(selected_epochs[fold])].iloc[0]
             for axis, train_column, validation_column in curves:
                 axis.plot(rows["epoch"], rows[train_column], color=INK, linewidth=1)
                 axis.plot(

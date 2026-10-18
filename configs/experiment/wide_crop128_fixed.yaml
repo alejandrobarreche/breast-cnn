@@ -1,0 +1,13 @@
+# @package _global_
+# wide_crop128_slow trained for a fixed 3 epochs, keeping the last one. Epoch 3 maximises
+# the mean validation curve of the other four folds for every fold of wide_crop128_slow.
+train:
+  experiment: wide_crop128_fixed
+  weighted_loss: true
+  model: configs/model/wide_crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
+  epochs: 3
+  epoch_selection: last

@@ -176,10 +176,12 @@ def fit_fold(
     device: torch.device,
     run_dir: Path,
 ) -> FoldResult:
-    """Train on four folds, validate on `fold` and keep the epoch with best patient AUC.
+    """Train on four folds, validate on `fold` and keep one epoch (reported as best_epoch).
 
-    Early stopping ends training after `early_stopping_patience` epochs without
-    improvement. Selecting the epoch on the same fold makes its AUC slightly optimistic.
+    With `epoch_selection: best` the kept epoch has the best patient AUC and early stopping
+    ends training after `early_stopping_patience` epochs without improvement; selecting the
+    epoch on the same fold makes its AUC optimistic. With `last`, exactly `epochs` epochs
+    are trained and the last one is kept, so the fold is not used to choose the epoch.
 
     After every epoch the full state is saved to `checkpoint_fold<k>.pt`; if that file
     exists, training continues from it. With `num_workers=0` the continuation is
@@ -269,9 +271,13 @@ def fit_fold(
             "seconds": time.perf_counter() - start,
         }
         state["history"].append(row)
-        improved = state["best_predictions"] is None or (
-            patient_auc is not None
-            and (state["best_auc"] is None or patient_auc > state["best_auc"])
+        improved = (
+            config.epoch_selection == "last"
+            or state["best_predictions"] is None
+            or (
+                patient_auc is not None
+                and (state["best_auc"] is None or patient_auc > state["best_auc"])
+            )
         )
         if improved:
             state.update(
@@ -282,8 +288,9 @@ def fit_fold(
             )
             torch.save(model.state_dict(), run_dir / f"model_fold{fold}.pt")
         state["epoch"] = epoch
-        state["finished"] = (
-            epoch >= config.epochs or epoch - state["best_epoch"] >= config.early_stopping_patience
+        state["finished"] = epoch >= config.epochs or (
+            config.epoch_selection == "best"
+            and epoch - state["best_epoch"] >= config.early_stopping_patience
         )
         if device.type == "cuda":
             peak = torch.cuda.max_memory_allocated(device)

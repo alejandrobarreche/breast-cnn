@@ -145,6 +145,21 @@ def test_sgd_and_central_slices_run(training_project: Path) -> None:
     assert len(pd.read_csv(run_dir / "predictions_validation.csv")) == 8
 
 
+def test_last_epoch_selection_trains_every_epoch_and_keeps_the_last(
+    training_project: Path,
+) -> None:
+    # Patience 1 would stop the default rule early; the fixed-epoch rule ignores it.
+    data, config = smoke_config(epochs=3, epoch_selection="last")
+    run_dir = run_experiment(training_project, data, config)
+    metrics = json.loads((run_dir / "metrics.json").read_text())
+    history = pd.read_csv(run_dir / "history.csv")
+    assert metrics["selection"] == "last_epoch"
+    assert [fold["best_epoch"] for fold in metrics["folds"]] == [3, 3]
+    assert history.groupby("fold")["epoch"].max().tolist() == [3, 3]
+    last = history.loc[history["epoch"].eq(3)].set_index("fold")["validation_patient_auc"]
+    assert [fold["patient"]["auc"] for fold in metrics["folds"]] == pytest.approx(last.tolist())
+
+
 def test_run_experiment_writes_complete_run(training_project: Path) -> None:
     data, config = smoke_config()
     run_dir = run_experiment(training_project, data, config)
