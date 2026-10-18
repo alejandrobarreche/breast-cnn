@@ -23,7 +23,7 @@ from breast_cnn.data.dataset import BreastDCEDataset
 from breast_cnn.data.metadata import load_samples
 from breast_cnn.evaluation import CalibratedEnsemble, load_fold_models
 
-OUTPUTS = ("fold_probabilities", "probability", "calibrated")
+OUTPUTS = ("fold_probabilities", "probability", "calibrated", "fold_calibrated")
 TOLERANCE = 1e-5
 REFERENCE_SLICES = 8
 

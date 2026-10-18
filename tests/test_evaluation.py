@@ -213,7 +213,7 @@ def test_calibrated_ensemble_matches_the_numpy_calibration() -> None:
     ensemble = CalibratedEnsemble(models, maps).eval()
     images = torch.rand(3, 3, 256, 256)
     with torch.no_grad():
-        folds, raw, calibrated = ensemble(images)
+        folds, raw, calibrated, fold_calibrated = ensemble(images)
         expected = torch.stack([torch.sigmoid(models[f](images)) for f in (0, 1)], dim=1)
     assert folds.numpy() == pytest.approx(expected.numpy(), abs=1e-7)
     assert raw.numpy() == pytest.approx(expected.mean(dim=1).numpy(), abs=1e-7)
@@ -221,6 +221,7 @@ def test_calibrated_ensemble_matches_the_numpy_calibration() -> None:
         [apply_platt(expected[:, f].numpy(), maps[f]) for f in (0, 1)], axis=0
     )
     assert calibrated.numpy() == pytest.approx(numpy_calibrated, abs=1e-6)
+    assert fold_calibrated.mean(dim=1).numpy() == pytest.approx(calibrated.numpy(), abs=1e-7)
 
 
 def test_calibrated_ensemble_exports_to_onnx_with_parity(tmp_path) -> None:
