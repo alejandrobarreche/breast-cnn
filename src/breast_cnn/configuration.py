@@ -76,6 +76,9 @@ class AnalysisConfig(BaseModel):
     bootstrap_strata: list[str]
     confidence_level: float = Field(gt=0, lt=1)
     seed: int = Field(ge=0)
+    final_run: str
+    min_specificity: float = Field(gt=0, lt=1)
+    calibration_report_path: str
 
 
 class DataConfig(BaseModel):
@@ -126,7 +129,7 @@ def load_train_config(
 def load_analysis_config(
     project_root: Path, overrides: list[str] | None = None
 ) -> tuple[DataConfig, AnalysisConfig]:
-    """Resolve the settings of the run analysis notebook."""
+    """Resolve the settings of the run analysis, calibration and final evaluation."""
     resolved = _compose(project_root, overrides)
     return DataConfig.model_validate(resolved["data"]), AnalysisConfig.model_validate(
         resolved["analysis"]

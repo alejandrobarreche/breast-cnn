@@ -72,3 +72,7 @@ analysis:
   bootstrap_strata: [fold, cohort, label]
   confidence_level: 0.95
   seed: 2026
+  # Final image-only model: its fold models are averaged on test after calibration.
+  final_run: runs/20261018-1330_wide_crop128_fixed
+  min_specificity: 0.9
+  calibration_report_path: artifacts/metrics/calibration_validation_patient.json

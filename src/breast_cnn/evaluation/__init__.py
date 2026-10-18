@@ -1,6 +1,12 @@
 """Analysis of finished runs: epoch selection, cohort baseline, bootstrap and ensemble."""
 
 from breast_cnn.evaluation.bootstrap import bootstrap_auc, paired_differences
+from breast_cnn.evaluation.calibration import (
+    apply_platt,
+    calibrate_and_threshold,
+    fit_platt,
+    specificity_threshold,
+)
 from breast_cnn.evaluation.ensemble import load_fold_models, predict_ensemble
 from breast_cnn.evaluation.runs import (
     Run,
@@ -15,10 +21,13 @@ from breast_cnn.evaluation.runs import (
 
 __all__ = [
     "Run",
+    "apply_platt",
     "bootstrap_auc",
+    "calibrate_and_threshold",
     "cohort_auc",
     "cohort_baseline",
     "epoch_selection",
+    "fit_platt",
     "fold_auc",
     "load_fold_models",
     "load_runs",
@@ -26,4 +35,5 @@ __all__ = [
     "patient_scores",
     "predict_ensemble",
     "selection_summary",
+    "specificity_threshold",
 ]
