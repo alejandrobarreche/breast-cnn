@@ -2,109 +2,195 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lector pCR</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" />
   </head>
   <body>
-    <div class="wrap">
-      <header class="top">
-        <h1>Lector <span>pCR</span></h1>
-        <span class="chip" id="model-chip" title="SHA-256 del modelo y diferencia máxima con las salidas de Python">modelo <b id="model-state">cargando</b></span>
-      </header>
+    <header class="bar">
+      <div class="bar-in">
+        <a class="brand" href="#top">Lector <span>pCR</span></a>
+        <nav class="nav" aria-label="Secciones">
+          <a href="#analizar">Analizar</a>
+          <a href="#red">Cómo funciona</a>
+          <a href="#resultados">Resultados</a>
+          <a href="#limitaciones">Limitaciones</a>
+        </nav>
+        <span class="chip" id="model-chip" title="SHA-256 del modelo y diferencia máxima con las salidas de Python"><i></i>modelo <b id="model-state">cargando</b></span>
+      </div>
+    </header>
 
-      <main class="grid">
-        <section class="card hero" aria-labelledby="net-title">
+    <main class="wrap" id="top">
+      <!-- Presentation -->
+      <section class="intro">
+        <p class="eyebrow">CNN 2D desde cero · DCE-MRI de mama · uso educativo</p>
+        <h1>Estimación de la respuesta patológica completa a partir de una resonancia previa al tratamiento</h1>
+        <p class="lead">
+          Una red convolucional lee un corte de resonancia magnética con contraste en sus tres fases y estima la probabilidad de que la paciente
+          alcance una respuesta patológica completa (pCR) tras la quimioterapia previa a la cirugía. El modelo se ejecuta en este navegador; las imágenes no salen del equipo.
+        </p>
+        <dl class="stats" id="stats"></dl>
+      </section>
+
+      <!-- Workbench -->
+      <section class="section" id="analizar" aria-labelledby="analizar-title">
+        <div class="section-head">
+          <span class="step">01</span>
+          <h2 id="analizar-title">Analizar un corte</h2>
+          <p>Elige un corte de test o carga los tres PNG de un corte nuevo. Después pulsa <b>Predecir</b>.</p>
+        </div>
+
+        <div class="picker">
+          <div class="tray" id="tray" role="list" aria-label="Cortes de ejemplo"></div>
+          <label class="drop" for="files" id="drop">
+            <span class="drop-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <b>Cargar corte</b>
+            <span>Tres PNG <code>_PRE</code> <code>_EARLY</code> <code>_LATE</code><br />256 × 256 · grises 8 bits · ≤ 2 MB</span>
+            <input id="files" type="file" accept="image/png" multiple hidden />
+          </label>
+        </div>
+        <ul class="errors" id="errors" aria-live="polite"></ul>
+
+        <div class="bench">
+          <div class="col">
+          <article class="card viewer" aria-labelledby="viewer-title">
+            <div class="card-head">
+              <span class="label">Fig. 2</span>
+              <span class="title" id="viewer-title">Fases DCE</span>
+              <span class="label sid" id="viewer-sample">—</span>
+            </div>
+            <div class="seg" role="tablist" aria-label="Vista" id="seg">
+              <span class="seg-thumb" aria-hidden="true"></span>
+              <button role="tab" data-view="0" aria-selected="true">PRE</button>
+              <button role="tab" data-view="1" aria-selected="false">EARLY</button>
+              <button role="tab" data-view="2" aria-selected="false">LATE</button>
+              <button role="tab" data-view="3" aria-selected="false">Realce</button>
+            </div>
+            <div class="stage">
+              <div class="main-view" id="main-view">
+                <div class="empty-view">Sin corte cargado</div>
+              </div>
+              <div class="side">
+                <div class="thumbs" id="thumbs"></div>
+                <label class="toggle"><input type="checkbox" id="crop-toggle" checked /> <span>Recorte central que ve la red</span></label>
+                <div class="legend" id="legend" aria-label="Escala del mapa de realce">
+                  <div class="ramp"></div>
+                  <div class="ticks"><span>−1</span><span>EARLY − PRE</span><span>+1</span></div>
+                </div>
+                <p class="explain" id="view-explain"></p>
+              </div>
+            </div>
+          </article>
+
+          <article class="card log" aria-labelledby="log-title">
+          <div class="card-head">
+            <span class="title" id="log-title">Registro de la defensa</span>
+            <span class="label" id="log-summary">0 de 5 · sin etiquetas reveladas</span>
+            <button class="btn small" id="copy-csv">Copiar CSV</button>
+          </div>
+          <table class="table">
+            <thead><tr><th>#</th><th>Corte</th><th class="num">Prob.</th><th class="num">Umbral</th><th>Clase</th><th>Real</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </article>
+          </div>
+
+          <article class="card result" aria-labelledby="res-title">
+            <div class="card-head">
+              <span class="label">Fig. 3</span>
+              <span class="title" id="res-title">Probabilidad de pCR</span>
+            </div>
+            <div aria-live="polite">
+              <div class="prob idle" id="prob">Carga un corte</div>
+              <div class="verdict"><span class="pill idle" id="pill">Sin muestra</span><span class="label" id="revealed"></span></div>
+              <p class="reading" id="reading"></p>
+            </div>
+            <svg id="ruler" viewBox="0 0 400 136" role="img" aria-label="Regla de 0 a 60 por ciento con el umbral, la proporción de pCR en train y los cinco modelos"></svg>
+            <dl class="facts">
+              <dt>Umbral</dt><dd id="f-threshold">—</dd>
+              <dt>Rango de los 5 modelos</dt><dd id="f-spread">—</dd>
+              <dt>Dispositivo</dt><dd>CPU · WebAssembly</dd>
+              <dt>Tiempo de inferencia</dt><dd id="f-time">—</dd>
+            </dl>
+            <div class="actions">
+              <button class="btn primary" id="predict" disabled>Predecir</button>
+              <button class="btn" id="reveal" disabled title="Solo para los cortes de ejemplo">Revelar etiqueta</button>
+              <button class="btn" id="clear" disabled>Limpiar</button>
+            </div>
+            <p class="notice"><b>Uso educativo, sin validez clínica.</b> Es una estimación sobre un único corte, no un diagnóstico: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.</p>
+          </article>
+        </div>
+
+      </section>
+
+      <!-- Network -->
+      <section class="section" id="red" aria-labelledby="red-title">
+        <div class="section-head">
+          <span class="step">02</span>
+          <h2 id="red-title">Cómo funciona</h2>
+          <p>La misma red se entrena cinco veces, una por partición de validación, y la salida final es la media de las cinco probabilidades calibradas.</p>
+        </div>
+        <article class="card hero" aria-labelledby="net-title">
           <div class="card-head">
             <span class="label">Fig. 1</span>
-            <span class="title" id="net-title">CNN 2D · 5 modelos · probabilidad calibrada</span>
-          </div>
-          <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
-          <div class="card-foot">
-            <span class="label" id="net-sample">—</span>
+            <span class="title" id="net-title">Arquitectura de la CNN 2D</span>
             <span class="label" id="net-readout"></span>
           </div>
-        </section>
+          <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
+        </article>
+        <ol class="steps" id="steps"></ol>
+      </section>
 
-        <section class="card phases" aria-labelledby="ph-title">
-          <div class="card-head"><span class="label">Fig. 2</span><span class="title" id="ph-title">Fases DCE</span></div>
-          <div class="quad" id="quad"></div>
-          <div class="legend" aria-label="Escala del mapa de realce">
-            <div class="ramp"></div>
-            <div class="ticks"><span>−1</span><span>0</span><span>+1</span></div>
-          </div>
-          <p class="explain">PRE se adquiere antes de inyectar el contraste; EARLY y LATE, poco después y más tarde. El mapa colorea sobre PRE la diferencia EARLY − PRE: donde la señal aumenta y donde disminuye. El tejido tumoral suele captar contraste pronto, por eso este mapa ayuda a localizarlo.</p>
-          <div class="card-foot">
-            <span class="hint">Tres PNG: <code>_PRE</code>, <code>_EARLY</code> y <code>_LATE</code>. También se pueden arrastrar a la página.</span>
-            <label class="btn" for="files">Cargar corte</label>
-          </div>
-        </section>
-
-        <section class="card result" aria-labelledby="res-title">
-          <div class="card-head"><span class="label">Fig. 3</span><span class="title" id="res-title">Probabilidad de pCR</span></div>
-          <div aria-live="polite">
-            <div class="prob idle" id="prob">Pulsa Predecir</div>
-            <div class="verdict"><span class="pill idle" id="pill">Sin muestra</span><span class="label" id="revealed"></span></div>
-            <p class="reading" id="reading"></p>
-          </div>
-          <svg id="ruler" viewBox="0 0 400 136" role="img" aria-label="Regla de 0 a 60 por ciento con el umbral, la proporción de pCR en train y los cinco modelos"></svg>
-          <dl class="facts">
-            <dt>Umbral</dt><dd id="f-threshold">—</dd>
-            <dt>Rango de los 5 modelos</dt><dd id="f-spread">—</dd>
-            <dt>Inferencia</dt><dd id="f-time">—</dd>
-          </dl>
-          <div class="actions">
-            <button class="btn primary" id="predict" disabled>Predecir</button>
-            <button class="btn" id="reveal" disabled>Revelar</button>
-            <button class="btn" id="clear" disabled>Limpiar</button>
-          </div>
-          <p class="notice"><b>Uso educativo, sin validez clínica.</b> Es una estimación sobre un único corte, no un diagnóstico: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.</p>
-        </section>
-
-        <section class="card log" aria-labelledby="log-title">
-          <div class="card-head"><span class="title" id="log-title">Registro de la defensa</span><span class="label" id="log-count">0 / 5</span></div>
-          <ol class="rows" id="rows"></ol>
-          <div class="card-foot"><span class="label" id="log-summary">Sin etiquetas reveladas</span><button class="btn full" id="copy-csv">Copiar CSV</button></div>
-        </section>
-      </main>
-
-      <p class="foot">Imágenes BreastDCEDL, CC BY-NC 4.0 · CNN 2D entrenada desde cero</p>
-    </div>
-
-    <nav class="dock" aria-label="Acciones">
-      <button data-sheet="examples" aria-expanded="false" aria-controls="sheet-examples">Ejemplos</button>
-      <button data-sheet="upload" aria-expanded="false" aria-controls="sheet-upload">Cargar</button>
-      <button data-sheet="model" aria-expanded="false" aria-controls="sheet-model">Modelo</button>
-    </nav>
-
-    <div class="sheet" id="sheet-examples" role="dialog" aria-label="Ejemplos">
-      <h2>Cortes de test</h2>
-      <div class="tray" id="tray"></div>
-    </div>
-
-    <div class="sheet" id="sheet-upload" role="dialog" aria-label="Cargar">
-      <h2>Cargar un corte</h2>
-      <div class="drop">
-        <div class="phase-slots">
-          <div><b>PRE</b><span>*_PRE.png</span></div>
-          <div><b>EARLY</b><span>*_EARLY.png</span></div>
-          <div><b>LATE</b><span>*_LATE.png</span></div>
+      <!-- Results -->
+      <section class="section" id="resultados" aria-labelledby="res-sec-title">
+        <div class="section-head">
+          <span class="step">03</span>
+          <h2 id="res-sec-title">Resultados y ficha del modelo</h2>
+          <p>Las decisiones (arquitectura, épocas, umbral) se tomaron con la validación cruzada por paciente. El conjunto de test se evaluó una sola vez, al final.</p>
         </div>
-        <span class="label">PNG · 256 × 256 · escala de grises de 8 bits · ≤ 2 MB</span>
-        <label class="btn" for="files">Elegir archivos</label>
-        <input id="files" type="file" accept="image/png" multiple hidden />
-        <ul class="errors" id="errors"></ul>
+        <div class="results">
+          <article class="card auc-card" aria-labelledby="auc-title">
+            <div class="card-head"><span class="label">Fig. 4</span><span class="title" id="auc-title">AUC en test, por paciente</span></div>
+            <svg id="auc" viewBox="0 0 560 190" role="img" aria-label="AUC de test con su intervalo de confianza, frente al azar y a la referencia por cohorte"></svg>
+            <p class="explain" id="auc-explain"></p>
+          </article>
+          <div class="spec" id="spec"></div>
+        </div>
+      </section>
+
+      <!-- Meaning and limitations -->
+      <section class="section" id="limitaciones" aria-labelledby="lim-title">
+        <div class="section-head">
+          <span class="step">04</span>
+          <h2 id="lim-title">Qué significa y qué no</h2>
+        </div>
+        <div class="columns">
+          <article class="card prose">
+            <h3>Conceptos</h3>
+            <p><b>pCR (respuesta patológica completa).</b> Algunas pacientes reciben quimioterapia antes de la cirugía (tratamiento neoadyuvante). Si al operar el patólogo no encuentra tumor invasivo residual, se habla de pCR. Es un indicador temprano de buena respuesta, no una garantía de curación.</p>
+            <p><b>DCE-MRI.</b> Resonancia magnética con contraste dinámico: se adquiere una imagen antes de inyectar el contraste (PRE) y varias después (EARLY, LATE). Cómo y cuándo capta contraste cada tejido aporta información sobre su vascularización.</p>
+            <p><b>Qué devuelve la aplicación.</b> Una probabilidad de 0,30 significa que el modelo estima P(pCR) = 0,30 para ese corte. No es un 30 % de curación ni indica si la cirugía es necesaria.</p>
+          </article>
+          <article class="card prose">
+            <h3>Limitaciones</h3>
+            <ul class="limits" id="limits"></ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap foot-in">
+        <span>Imágenes: BreastDCEDL, CC BY-NC 4.0, con atribución a sus fuentes originales (Duke, I-SPY1, I-SPY2).</span>
+        <span>Caso práctico de Aprendizaje Automático · CNN entrenada desde cero en PyTorch, exportada a ONNX.</span>
       </div>
-    </div>
+    </footer>
 
-    <div class="sheet" id="sheet-model" role="dialog" aria-label="Modelo">
-      <h2>Ficha del modelo</h2>
-      <div class="spec" id="spec"></div>
-    </div>
-
-    <div class="catch" id="catch" aria-hidden="true"><div>PRE · EARLY · LATE</div></div>
+    <div class="catch" id="catch" aria-hidden="true"><div>Suelta PRE · EARLY · LATE</div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
