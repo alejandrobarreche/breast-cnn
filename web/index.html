@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Lector pCR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>Lector <span>pCR</span></h1>
+        <span class="chip" id="model-chip" title="SHA-256 del modelo y diferencia máxima con las salidas de Python">modelo <b id="model-state">cargando</b></span>
+      </header>
+
+      <main class="grid">
+        <section class="card hero" aria-labelledby="net-title">
+          <div class="card-head">
+            <span class="label">Fig. 1</span>
+            <span class="label" id="net-title">CNN 2D · 5 modelos · probabilidad calibrada</span>
+          </div>
+          <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
+          <div class="card-foot">
+            <span class="label" id="net-sample">—</span>
+            <span class="label" id="net-readout"></span>
+          </div>
+        </section>
+
+        <section class="card phases" aria-labelledby="ph-title">
+          <div class="card-head"><span class="label">Fig. 2</span><span class="label" id="ph-title">Fases DCE</span></div>
+          <div class="quad" id="quad"></div>
+        </section>
+
+        <section class="card result" aria-labelledby="res-title">
+          <div class="card-head"><span class="label">Fig. 3</span><span class="label" id="res-title">Probabilidad de pCR</span></div>
+          <div aria-live="polite">
+            <div class="prob" id="prob">—<small>%</small></div>
+            <div class="verdict"><span class="pill idle" id="pill">Sin muestra</span><span class="label" id="revealed"></span></div>
+          </div>
+          <svg id="ruler" viewBox="0 0 400 136" role="img" aria-label="Regla de 0 a 60 por ciento con el umbral, la proporción de pCR en train y los cinco modelos"></svg>
+          <dl class="facts">
+            <dt>Umbral</dt><dd id="f-threshold">—</dd>
+            <dt>Rango de los 5 modelos</dt><dd id="f-spread">—</dd>
+            <dt>Inferencia</dt><dd id="f-time">—</dd>
+          </dl>
+          <div class="actions">
+            <button class="btn primary" id="predict" disabled>Predecir</button>
+            <button class="btn" id="reveal" disabled>Revelar</button>
+            <button class="btn" id="clear" disabled>Limpiar</button>
+          </div>
+        </section>
+
+        <section class="card log" aria-labelledby="log-title">
+          <div class="card-head"><span class="label" id="log-title">Registro</span><span class="label" id="log-count">0 / 5</span></div>
+          <ol class="rows" id="rows"></ol>
+          <div class="card-foot"><button class="btn full" id="copy-csv">Copiar CSV</button></div>
+        </section>
+      </main>
+
+      <p class="foot">Uso educativo, sin validez clínica · imágenes BreastDCEDL, CC BY-NC 4.0</p>
+    </div>
+
+    <nav class="dock" aria-label="Acciones">
+      <button data-sheet="examples" aria-expanded="false" aria-controls="sheet-examples">Ejemplos</button>
+      <button data-sheet="upload" aria-expanded="false" aria-controls="sheet-upload">Cargar</button>
+      <button data-sheet="model" aria-expanded="false" aria-controls="sheet-model">Modelo</button>
+    </nav>
+
+    <div class="sheet" id="sheet-examples" role="dialog" aria-label="Ejemplos">
+      <h2>Cortes de test</h2>
+      <div class="tray" id="tray"></div>
+    </div>
+
+    <div class="sheet" id="sheet-upload" role="dialog" aria-label="Cargar">
+      <h2>Cargar un corte</h2>
+      <div class="drop">
+        <div class="phase-slots">
+          <div><b>PRE</b><span>*_PRE.png</span></div>
+          <div><b>EARLY</b><span>*_EARLY.png</span></div>
+          <div><b>LATE</b><span>*_LATE.png</span></div>
+        </div>
+        <span class="label">PNG · 256 × 256 · escala de grises de 8 bits · ≤ 2 MB</span>
+        <label class="btn" for="files">Elegir archivos</label>
+        <input id="files" type="file" accept="image/png" multiple hidden />
+        <ul class="errors" id="errors"></ul>
+      </div>
+    </div>
+
+    <div class="sheet" id="sheet-model" role="dialog" aria-label="Modelo">
+      <h2>Ficha del modelo</h2>
+      <div class="spec" id="spec"></div>
+    </div>
+
+    <div class="catch" id="catch" aria-hidden="true"><div>PRE · EARLY · LATE</div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

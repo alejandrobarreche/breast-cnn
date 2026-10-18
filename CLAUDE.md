@@ -37,6 +37,7 @@ Principios:
 - La lógica reutilizable está en `src/breast_cnn/`; `scripts/` solo contiene puntos de entrada; los notebooks importan el paquete.
 - Parámetros y rutas en `configs/`. **Las arquitecturas se describen en YAML** dentro de `configs/` y el código las construye; ninguna arquitectura concreta se codifica en un `.py`.
 - PyTorch explícito, sin Lightning.
+- La aplicación web está en `web/` (Vite + TypeScript, ONNX Runtime Web en WebAssembly). Su modelo, manifiesto y ejemplos se generan con `scripts/export_onnx.py` y `scripts/export_web.py`; su preprocesado replica `load_dce_triplet` y `npm test` lo comprueba frente a las salidas de Python.
 - Entorno Conda `ml-cnn` (`environment.yml`); dependencias en `pyproject.toml` (Poetry).
 - Verificación:
 
@@ -80,6 +81,7 @@ El usuario no tiene formación médica. Los conceptos clínicos (pCR, DCE-MRI, r
 - El título nombra el contenido según la sección 5. El subtítulo indica split, unidad (`corte` o `paciente`), clase positiva y umbral cuando corresponda.
 - Matplotlib. Las funciones de dibujo viven en `src/breast_cnn/visualization/` y separan el cálculo de los datos del dibujo.
 - Salida en PNG con nombres en `snake_case` que incluyen split y unidad, por ejemplo `roc_validation_patient.png`. Las figuras de análisis van a `artifacts/figures/`; las de un entrenamiento, a la carpeta de su run (sección 12).
+- La aplicación web usa tema oscuro con sus tokens en `web/src/style.css`; los colores de clase y la escala de realce son los de `style.py`.
 - Para cambiar el estilo se modifican `style.py` y esta sección; nunca se definen estilos sueltos dentro de un script o notebook.
 
 ## 9. Investigación

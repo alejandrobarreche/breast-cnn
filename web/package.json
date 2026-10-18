@@ -1,0 +1,25 @@
+{
+  "name": "lector-pcr",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "ort": "node scripts/copy-ort.mjs",
+    "dev": "npm run ort && vite",
+    "build": "npm run ort && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "onnxruntime-web": "1.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/pngjs": "6.0.5",
+    "onnxruntime-node": "1.20.1",
+    "pngjs": "7.0.0",
+    "typescript": "5.6.3",
+    "vite": "5.4.11",
+    "vitest": "2.1.8"
+  }
+}

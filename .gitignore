@@ -42,3 +42,9 @@ build/
 *.ckpt
 *.pt
 *.pth
+
+# Web application: dependencies, build and files copied by its scripts.
+/web/node_modules/
+/web/dist/
+/web/public/model/
+/web/public/ort/
