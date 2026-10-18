@@ -48,3 +48,8 @@ build/
 /web/dist/
 /web/public/model/
 /web/public/ort/
+
+# Local agent skills (personal tooling, not part of the project).
+/.agents/
+/.claude/skills/
+/skills-lock.json
