@@ -76,6 +76,12 @@ analysis:
   final_run: runs/20261018-1330_wide_crop128_fixed
   min_specificity: 0.9
   calibration_report_path: artifacts/metrics/calibration_validation_patient.json
+  # Same protocol per slice, for the web application (one slice per prediction).
+  slice_calibration_report_path: artifacts/metrics/calibration_validation_slice.json
+  # Web application model (outside Git) and its export report with checksum and parity.
+  onnx_path: artifacts/models/ensemble.onnx
+  onnx_report_path: artifacts/metrics/onnx_export.json
+  onnx_parity_slices: 512
   # Single test evaluation (scripts/evaluate_test.py); existing outputs are never overwritten.
   test_report_path: artifacts/metrics/test_evaluation_patient.json
   test_predictions_path: artifacts/metrics/predictions_test_slice.csv

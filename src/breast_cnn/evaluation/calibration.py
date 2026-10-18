@@ -40,17 +40,22 @@ def apply_platt(probabilities: np.ndarray, platt: dict) -> np.ndarray:
     return 1 / (1 + np.exp(-scores))
 
 
-def fit_fold_calibration(predictions: pd.DataFrame) -> tuple[dict[int, dict], pd.DataFrame]:
-    """Fit one Platt map per fold model on the patients of its own validation fold.
+def fit_fold_calibration(
+    predictions: pd.DataFrame, unit: str = "patient"
+) -> tuple[dict[int, dict], pd.DataFrame]:
+    """Fit one Platt map per fold model on its own validation fold, per patient or per slice.
 
-    Returns the maps and the out-of-fold patient table with raw and calibrated probability.
+    Returns the maps and the out-of-fold table (one row per unit) with raw and calibrated
+    probability. Patient probabilities are the mean over slices.
     """
+    if unit not in ("patient", "slice"):
+        raise ValueError(f"unit must be patient or slice, got {unit}")
     maps, tables = {}, []
     for fold, rows in predictions.groupby("fold"):
-        patients = aggregate_patients(rows)
-        maps[int(fold)] = fit_platt(patients["probability"], patients["label"])
-        patients["calibrated"] = apply_platt(patients["probability"], maps[int(fold)])
-        tables.append(patients.assign(fold=int(fold)))
+        units = aggregate_patients(rows) if unit == "patient" else rows.copy()
+        maps[int(fold)] = fit_platt(units["probability"], units["label"])
+        units["calibrated"] = apply_platt(units["probability"], maps[int(fold)])
+        tables.append(units.assign(fold=int(fold)))
     return maps, pd.concat(tables, ignore_index=True)
 
 
@@ -66,9 +71,14 @@ def specificity_threshold(labels: np.ndarray, scores: np.ndarray, min_specificit
     return float(np.nextafter(scores.max(), np.inf))
 
 
-def calibrate_and_threshold(predictions: pd.DataFrame, min_specificity: float) -> dict:
-    """Calibration maps, the pooled out-of-fold threshold and its validation metrics."""
-    maps, patients = fit_fold_calibration(predictions)
+def calibrate_and_threshold(
+    predictions: pd.DataFrame, min_specificity: float, unit: str = "patient"
+) -> dict:
+    """Calibration maps, the pooled out-of-fold threshold and its validation metrics.
+
+    `unit="slice"` serves the web application, which scores one slice at a time.
+    """
+    maps, patients = fit_fold_calibration(predictions, unit)
     threshold = specificity_threshold(patients["label"], patients["calibrated"], min_specificity)
     per_fold = {}
     for fold, rows in patients.groupby("fold"):
@@ -81,8 +91,8 @@ def calibrate_and_threshold(predictions: pd.DataFrame, min_specificity: float) -
             **binary_metrics(rows["label"], rows["calibrated"], threshold),
         }
     return {
-        "unit": "patient",
-        "aggregation": "mean_probability_per_patient",
+        "unit": unit,
+        "aggregation": "mean_probability_per_patient" if unit == "patient" else None,
         "calibration": "platt_per_fold_on_own_validation_fold_slope_nonnegative",
         # Test: AUC from the mean raw probability of the fold models (threshold-free);
         # sensitivity and specificity from the mean calibrated probability at `threshold`.

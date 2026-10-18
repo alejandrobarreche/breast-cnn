@@ -79,6 +79,10 @@ class AnalysisConfig(BaseModel):
     final_run: str
     min_specificity: float = Field(gt=0, lt=1)
     calibration_report_path: str
+    slice_calibration_report_path: str
+    onnx_path: str
+    onnx_report_path: str
+    onnx_parity_slices: int = Field(gt=0)
     test_report_path: str
     test_predictions_path: str
 

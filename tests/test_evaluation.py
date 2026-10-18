@@ -3,9 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from sklearn.metrics import roc_auc_score
 
 from breast_cnn.evaluation import (
+    CalibratedEnsemble,
     apply_platt,
     bootstrap_auc,
     calibrate_and_threshold,
@@ -19,6 +21,7 @@ from breast_cnn.evaluation import (
     specificity_threshold,
 )
 from breast_cnn.evaluation.bootstrap import _weighted_auc
+from breast_cnn.models import ModelConfig, build_model
 
 
 def test_out_of_fold_selection_ignores_the_evaluated_fold() -> None:
@@ -172,3 +175,65 @@ def test_test_evaluation_on_synthetic_patients() -> None:
     counts = report["at_threshold"]
     assert counts["true_positives"] + counts["false_negatives"] == 30
     assert set(report["by_cohort"]) == {"a", "b"}
+
+
+def test_slice_calibration_scores_every_slice() -> None:
+    rows = [
+        {"fold": fold, "patient_id": f"{fold}_{p}", "label": int(p < 3), "probability": prob}
+        for fold in (0, 1)
+        for p in range(10)
+        for prob in (0.2 + 0.05 * p, 0.25 + 0.05 * p)
+    ]
+    report = calibrate_and_threshold(pd.DataFrame(rows), 0.9, unit="slice")
+    assert report["unit"] == "slice" and report["aggregation"] is None
+    assert report["pooled_validation"]["n"] == 40
+    with pytest.raises(ValueError):
+        calibrate_and_threshold(pd.DataFrame(rows), 0.9, unit="cohort")
+
+
+def _tiny_models() -> dict[int, torch.nn.Module]:
+    config = ModelConfig(
+        in_channels=3,
+        kernel_size=3,
+        activation="relu",
+        stages=[{"channels": 4, "convs": 1}],
+        dropout=0.0,
+        input_crop=128,
+    )
+    models = {}
+    for fold in (0, 1):
+        torch.manual_seed(fold)
+        models[fold] = build_model(config).eval()
+    return models
+
+
+def test_calibrated_ensemble_matches_the_numpy_calibration() -> None:
+    maps = {0: {"slope": 0.4, "intercept": -0.9}, 1: {"slope": 0.0, "intercept": -1.0}}
+    models = _tiny_models()
+    ensemble = CalibratedEnsemble(models, maps).eval()
+    images = torch.rand(3, 3, 256, 256)
+    with torch.no_grad():
+        folds, raw, calibrated = ensemble(images)
+        expected = torch.stack([torch.sigmoid(models[f](images)) for f in (0, 1)], dim=1)
+    assert folds.numpy() == pytest.approx(expected.numpy(), abs=1e-7)
+    assert raw.numpy() == pytest.approx(expected.mean(dim=1).numpy(), abs=1e-7)
+    numpy_calibrated = np.mean(
+        [apply_platt(expected[:, f].numpy(), maps[f]) for f in (0, 1)], axis=0
+    )
+    assert calibrated.numpy() == pytest.approx(numpy_calibrated, abs=1e-6)
+
+
+def test_calibrated_ensemble_exports_to_onnx_with_parity(tmp_path) -> None:
+    onnxruntime = pytest.importorskip("onnxruntime")
+    pytest.importorskip("onnxscript")
+    maps = {0: {"slope": 0.4, "intercept": -0.9}, 1: {"slope": 0.2, "intercept": -0.5}}
+    ensemble = CalibratedEnsemble(_tiny_models(), maps).eval()
+    path = tmp_path / "ensemble.onnx"
+    image = torch.rand(1, 3, 256, 256)
+    with torch.no_grad():
+        torch.onnx.export(ensemble, (image,), str(path), input_names=["images"], dynamo=True)
+        expected = [t.numpy() for t in ensemble(image)]
+    session = onnxruntime.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    actual = session.run(None, {"images": image.numpy()})
+    for want, got in zip(expected, actual, strict=True):
+        assert np.abs(want - got).max() < 1e-5

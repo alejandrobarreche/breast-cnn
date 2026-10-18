@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Fit per-fold Platt calibration and the patient threshold on internal validation only.
+"""Fit per-fold Platt calibration and the threshold on internal validation only.
 
-  python scripts/fit_calibration.py
-  python scripts/fit_calibration.py analysis.final_run=runs/<id>
+  python scripts/fit_calibration.py                # per patient (test evaluation)
+  python scripts/fit_calibration.py --unit slice   # per slice (web application)
 
-Writes analysis.calibration_report_path; the test evaluation reads it unchanged.
+Writes analysis.calibration_report_path or analysis.slice_calibration_report_path.
 """
 
 import argparse
@@ -22,6 +22,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("overrides", nargs="*", help="Hydra key=value overrides")
+    parser.add_argument("--unit", choices=["patient", "slice"], default="patient")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     _, analysis = load_analysis_config(root, args.overrides)
@@ -29,9 +30,13 @@ def main() -> None:
     predictions = pd.read_csv(run_dir / "predictions_validation.csv")
     report = {
         "run": analysis.final_run,
-        **calibrate_and_threshold(predictions, analysis.min_specificity),
+        **calibrate_and_threshold(predictions, analysis.min_specificity, args.unit),
     }
-    path = root / analysis.calibration_report_path
+    path = root / (
+        analysis.calibration_report_path
+        if args.unit == "patient"
+        else analysis.slice_calibration_report_path
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     pooled = report["pooled_validation"]
