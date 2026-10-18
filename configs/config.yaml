@@ -38,6 +38,9 @@ train:
   seed: 2026
   epochs: 40
   early_stopping_patience: 8
+  # best: keep the epoch with best validation patient AUC, with early stopping.
+  # last: train exactly `epochs` epochs and keep the last one (fixed-epoch protocol).
+  epoch_selection: best
   batch_size: 32
   num_workers: 4
   optimizer: adamw  # adamw | sgd (momentum 0.9)
@@ -59,3 +62,13 @@ train:
   train_slices_per_patient: null
   threshold: 0.5
   runs_dir: runs
+
+# Analysis of finished runs (notebooks/02_runs_analysis.ipynb); internal validation only.
+analysis:
+  runs_dir: runs
+  figures_dir: artifacts/figures
+  reference: crop128_slow
+  bootstrap_resamples: 10000
+  bootstrap_strata: [fold, cohort, label]
+  confidence_level: 0.95
+  seed: 2026

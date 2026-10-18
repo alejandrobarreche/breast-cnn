@@ -36,6 +36,9 @@ class TrainConfig(BaseModel):
     seed: int = Field(ge=0, lt=2**63)
     epochs: int = Field(gt=0)
     early_stopping_patience: int = Field(gt=0)
+    # best: epoch with best validation patient AUC, with early stopping (optimistic).
+    # last: train exactly `epochs` epochs and keep the last one (no selection on the fold).
+    epoch_selection: Literal["best", "last"] = "best"
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
     optimizer: Literal["adamw", "sgd"]  # sgd: momentum 0.9
@@ -61,6 +64,18 @@ class TrainConfig(BaseModel):
         if len(set(value)) != len(value) or not set(value) <= set(range(5)):
             raise ValueError("folds must be distinct values in 0-4")
         return value
+
+
+class AnalysisConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    runs_dir: str
+    figures_dir: str
+    reference: str
+    bootstrap_resamples: int = Field(gt=0)
+    bootstrap_strata: list[str]
+    confidence_level: float = Field(gt=0, lt=1)
+    seed: int = Field(ge=0)
 
 
 class DataConfig(BaseModel):
@@ -105,4 +120,14 @@ def load_train_config(
     resolved = _compose(project_root, overrides)
     return DataConfig.model_validate(resolved["data"]), TrainConfig.model_validate(
         resolved["train"]
+    )
+
+
+def load_analysis_config(
+    project_root: Path, overrides: list[str] | None = None
+) -> tuple[DataConfig, AnalysisConfig]:
+    """Resolve the settings of the run analysis notebook."""
+    resolved = _compose(project_root, overrides)
+    return DataConfig.model_validate(resolved["data"]), AnalysisConfig.model_validate(
+        resolved["analysis"]
     )
