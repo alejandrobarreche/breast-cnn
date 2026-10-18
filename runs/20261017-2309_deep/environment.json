@@ -1,0 +1,20 @@
+{
+  "commit": "0a2a531aa5ba534fe564f82d852791be49f767a3",
+  "uncommitted_changes": false,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.14",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "cuda": "12.6",
+  "versions": {
+    "breast-cnn": "0.0.0",
+    "torch": "2.14.0+cu126",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1"
+  },
+  "batch_size": 32,
+  "total_seconds": 1781.1224596999818,
+  "mean_epoch_seconds": 27.830038432812216,
+  "peak_gpu_memory_bytes": 932271104
+}

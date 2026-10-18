@@ -1,0 +1,61 @@
+data:
+  metadata_dir: metadata
+  image_path_aliases:
+    dataset: data
+  expected_image_size:
+  - 256
+  - 256
+train:
+  experiment: deep
+  model: configs/model/deep.yaml
+  folds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  seed: 2026
+  epochs: 40
+  early_stopping_patience: 8
+  batch_size: 32
+  num_workers: 4
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  horizontal_flip_probability: 0.5
+  rotation_degrees: 0.0
+  max_translation: 0.0
+  scale_range:
+  - 1.0
+  - 1.0
+  weighted_loss: true
+  loss_unit: slice
+  patient_pooling: mean
+  patients_per_batch: 3
+  label_smoothing: 0.0
+  train_slices_per_patient: null
+  threshold: 0.5
+  runs_dir: runs
+model:
+  in_channels: 3
+  kernel_size: 3
+  activation: relu
+  stages:
+  - channels: 8
+    convs: 3
+    conv: standard
+  - channels: 16
+    convs: 3
+    conv: standard
+  - channels: 32
+    convs: 3
+    conv: standard
+  - channels: 64
+    convs: 3
+    conv: standard
+  - channels: 128
+    convs: 3
+    conv: standard
+  dropout: 0.3
+  input_crop: null
+  input_pool: 1
