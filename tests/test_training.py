@@ -11,6 +11,7 @@ from PIL import Image
 from torch import nn
 
 from breast_cnn.configuration import DataConfig, TrainConfig, load_train_config
+from breast_cnn.evaluation import load_fold_models, predict_ensemble
 from breast_cnn.training import (
     aggregate_patients,
     binary_metrics,
@@ -158,6 +159,22 @@ def test_last_epoch_selection_trains_every_epoch_and_keeps_the_last(
     assert history.groupby("fold")["epoch"].max().tolist() == [3, 3]
     last = history.loc[history["epoch"].eq(3)].set_index("fold")["validation_patient_auc"]
     assert [fold["patient"]["auc"] for fold in metrics["folds"]] == pytest.approx(last.tolist())
+
+
+def test_ensemble_reproduces_fold_predictions_and_averages(training_project: Path) -> None:
+    data, config = smoke_config(epochs=2, epoch_selection="last")
+    run_dir = run_experiment(training_project, data, config)
+    models = load_fold_models(run_dir, torch.device("cpu"))
+    samples = pd.read_csv(training_project / "metadata/samples.csv")
+    ensemble = predict_ensemble(models, samples, training_project, data, torch.device("cpu"))
+    stored = pd.read_csv(run_dir / "predictions_validation.csv")
+    for fold in (0, 3):
+        expected = stored.loc[stored["fold"].eq(fold)].set_index("sample_id")["probability"]
+        actual = ensemble.set_index("sample_id").loc[expected.index, f"probability_fold{fold}"]
+        assert actual.tolist() == pytest.approx(expected.tolist(), abs=1e-6)
+    mean = ensemble[["probability_fold0", "probability_fold3"]].mean(axis=1)
+    assert ensemble["probability"].tolist() == pytest.approx(mean.tolist())
+    assert len(ensemble) == len(samples)
 
 
 def test_run_experiment_writes_complete_run(training_project: Path) -> None:
