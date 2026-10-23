@@ -16,6 +16,7 @@
           <span class="nav-thumb" aria-hidden="true"></span>
           <a href="#datos">Datos</a>
           <a href="#red">Arquitectura</a>
+          <a href="#laboratorio">Laboratorio</a>
           <a href="#analizar">Analizar</a>
           <a href="#resultados">Resultados</a>
           <a href="#limitaciones">Limitaciones</a>
@@ -122,6 +123,35 @@
         </div>
       </section>
 
+      <!-- Lab: every training run on the internal validation -->
+      <section class="section" id="laboratorio" aria-labelledby="lab-title">
+        <div class="section-head">
+          <h2 id="lab-title">Laboratorio de experimentos</h2>
+          <p id="lab-lead"></p>
+        </div>
+        <div class="lab">
+          <figure class="figure">
+            <svg id="lab" role="img" aria-label="AUC por paciente en validación de cada experimento"></svg>
+            <figcaption>
+              <span class="key-dot solid"></span> media de los cinco folds con la época elegida sin mirar el fold evaluado, y su desviación estándar;
+              <span class="key-dot small"></span> cada fold;
+              <span class="key-dot ring"></span> media eligiendo la mejor época en el propio fold, que es optimista.
+              La línea vertical continua es la referencia que solo usa la tasa de pCR de cada cohorte. Pulsa una fila para ver el experimento.
+            </figcaption>
+          </figure>
+          <div class="lab-side">
+            <h3 id="exp-title"></h3>
+            <ul class="changes" id="exp-changes"></ul>
+            <table class="table compact" id="exp-folds"></table>
+            <figure class="figure">
+              <svg id="curves" role="img" aria-label="Curvas de aprendizaje medias del experimento"></svg>
+              <figcaption id="curves-caption"></figcaption>
+            </figure>
+          </div>
+        </div>
+        <div class="lab-notes" id="lab-notes"></div>
+      </section>
+
       <!-- Workbench -->
       <section class="section" id="analizar" aria-labelledby="analizar-title">
         <div class="section-head">
@@ -167,6 +197,22 @@
                   Aquí es orientativo: las intensidades están normalizadas por volumen y el eje horizontal muestra el orden de las fases, no el tiempo.
                   La red recibe las tres fases como canales y puede aprender este tipo de relación, pero nadie se la indica.
                 </p>
+              </div>
+            </div>
+
+            <div class="probe occlusion-block">
+              <div class="occlusion-view">
+                <canvas id="occlusion" width="256" height="256" aria-label="Mapa de oclusión sobre el recorte central"></canvas>
+                <div class="legend"><span>Tapar baja P(pCR)</span><div class="ramp reversed"></div><span>Tapar sube P(pCR)</span></div>
+              </div>
+              <div class="probe-text">
+                <h3>Mapa de oclusión</h3>
+                <p class="prose-small">Se tapa el recorte central por cuadros de 16 × 16 píxeles, uno cada vez, y se vuelve a calcular la probabilidad. Los cuadros coral son zonas que empujan la estimación hacia pCR (al taparlas, baja) y los verde petróleo, hacia sin pCR.</p>
+                <div class="pipe-actions">
+                  <button class="btn small" id="occlusion-run" disabled>Calcular mapa</button>
+                  <span class="muted" id="occlusion-status" aria-live="polite"></span>
+                </div>
+                <p class="prose-small muted">Muestra qué cambia la salida de este modelo, no dónde está el tumor ni qué causa la respuesta. Con un AUC de 0,59, el mapa puede reflejar sobre todo ruido.</p>
               </div>
             </div>
           </div>

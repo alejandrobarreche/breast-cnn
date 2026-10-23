@@ -2,7 +2,10 @@ import "./style.css";
 import manifest from "./manifest.json";
 import { apply as augmentPhase, sample as sampleAugmentation, type Augmentation } from "./augment";
 import { drawAuc } from "./auc";
+import { describe, drawCurves, drawLab, mean, std, type Experiment } from "./lab";
 import { steps as layerSteps } from "./layers";
+import { occlusion, type OcclusionMap } from "./occlusion";
+import runs from "./runs.json";
 import { loadModel, type Model, type Prediction } from "./model";
 import { drawNetwork } from "./network";
 import { checkHeader, checkNames, MAX_BYTES, PHASES, SIZE, toTensor, type Phase } from "./preprocess";
@@ -286,6 +289,107 @@ function drawField() {
       : `Tras el promedio global, la decisión depende de todo el recorte de ${CROP} × ${CROP}.`;
 }
 
+/* ---------- Lab: every training run on the internal validation ---------- */
+const experiments = runs.experiments as Experiment[];
+const cohortBaseline = mean(runs.cohort_baseline);
+const finalRun = experiments.find((e) => e.final)!;
+const labFigure = drawLab($("lab") as unknown as SVGSVGElement, experiments, cohortBaseline, (name) => selectExperiment(name));
+function renderLab() {
+  const honest = experiments.map((e) => mean(e.auc));
+  const optimism = experiments.map((e) => mean(e.best_auc) - mean(e.auc));
+  const spread = experiments.map((e) => std(e.auc));
+  $("lab-lead").textContent =
+    `${experiments.length} entrenamientos con validación cruzada por paciente en cinco folds. Cada uno cambia uno o varios factores respecto a la referencia (${runs.reference}). ` +
+    `La métrica es el AUC por paciente: la probabilidad de que una paciente con pCR reciba una puntuación mayor que una sin pCR.`;
+  const notes: [string, string][] = [
+    ["Lo que permiten concluir",
+      `Los experimentos obtienen entre ${comma(Math.min(...honest))} y ${comma(Math.max(...honest))}, y la desviación entre folds de cada uno va de ${comma(Math.min(...spread), 2)} a ${comma(Math.max(...spread), 2)}. ` +
+      `Son diferencias del mismo orden que la variación entre folds: con cinco folds no se puede ordenar los experimentos con seguridad. ` +
+      `Los mejores superan en unas ${comma(Math.max(...honest) - cohortBaseline, 2)} a la referencia que solo conoce la cohorte (${comma(cohortBaseline)}).`],
+    ["Por qué no se elige la mejor época",
+      `Elegir en cada fold la época con mayor AUC en ese mismo fold usa la validación para decidir y para medir. En estos experimentos eso añade entre ${comma(Math.min(...optimism), 2)} y ${comma(Math.max(...optimism), 2)} al AUC. ` +
+      `Por eso cada fold se lee en la época que maximiza la curva media de los otros cuatro.`],
+    ["Modelo final",
+      `${finalRun.name} repite wide_crop128_slow (canales 16 → 256, recorte 128, aumento y tasa 0,0001) con 3 épocas fijas, la época que maximizaba la curva media de los otros folds, y guarda la última. ` +
+      `Al reentrenarlo obtuvo ${comma(mean(finalRun.auc))}: el pico de ${comma(mean(experiments.find((e) => e.name === "wide_crop128_slow")!.auc))} no se reprodujo. ` +
+      `El conjunto de test no intervino en ninguna de estas decisiones.`],
+  ];
+  $("lab-notes").replaceChildren(...notes.map(([title, body]) => {
+    const div = make("div");
+    div.append(make("h3", "", title), make("p", "", body));
+    return div;
+  }));
+}
+function selectExperiment(name: string) {
+  const e = experiments.find((x) => x.name === name)!;
+  labFigure.select(name);
+  $("exp-title").textContent = e.name + (e.final ? " (modelo final)" : "");
+  const changes = describe(e.changes as Record<string, unknown>, runs.reference_settings as Record<string, unknown>);
+  $("exp-changes").replaceChildren(...(changes.length ? changes : ["Referencia: BCE ponderada, AdamW con tasa 0,001, canales 8 → 128, imagen completa, sin aumento geométrico"]).map((c) => make("li", "", c)));
+  table($("exp-folds") as HTMLTableElement, ["Fold", e.selection === "last" ? "Última época" : "Época sin mirar el fold", "Mejor época del fold"], [
+    ...e.auc.map((v, k) => [String(k + 1), comma(v), comma(e.best_auc[k])]),
+    ["Media", `${comma(mean(e.auc))} ± ${comma(std(e.auc), 3)}`, comma(mean(e.best_auc))],
+  ]);
+  drawCurves($("curves") as unknown as SVGSVGElement, e, cohortBaseline);
+  const hasTrain = e.curves.train.some((v) => v != null);
+  $("curves-caption").textContent =
+    `AUC por paciente, media de los folds en cada época. ` +
+    (hasTrain ? "La distancia entre entrenamiento (discontinua) y validación (continua) mide el sobreajuste. " : "Este run no registró el AUC de entrenamiento. ") +
+    "La línea de puntos es la referencia por cohorte.";
+}
+
+/* ---------- Occlusion map of the loaded slice ---------- */
+// One inference at a time on the session: Predict waits while the map is computed
+let occlusionRun = 0, occluding = false;
+let occlusionMap: OcclusionMap | null = null;
+function drawOcclusion() {
+  const canvas = $("occlusion") as HTMLCanvasElement, ctx = canvas.getContext("2d")!;
+  const o = (SIZE - CROP) / 2, k = canvas.width / CROP;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (state.views[0]) ctx.drawImage(state.views[0], o, o, CROP, CROP, 0, 0, canvas.width, canvas.height);
+  const map = occlusionMap;
+  if (!map) return;
+  const top = Math.max(1e-6, ...Array.from(map.deltas, Math.abs));
+  for (let i = 0; i < map.deltas.length; i++) {
+    const d = map.deltas[i];
+    // Covering a region that lowers P(pCR) means that region pushed towards pCR: coral
+    const [r, g, b] = enhancementColour(-d / top);
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.15 + 0.6 * Math.abs(d) / top})`;
+    ctx.fillRect((i % map.size) * map.patch * k, Math.floor(i / map.size) * map.patch * k, map.patch * k, map.patch * k);
+  }
+}
+function resetOcclusion() {
+  occlusionRun++;
+  occlusionMap = null;
+  ($("occlusion-run") as HTMLButtonElement).textContent = "Calcular mapa";
+  $("occlusion-status").textContent = "";
+  drawOcclusion();
+}
+$("occlusion-run").addEventListener("click", async () => {
+  const button = $("occlusion-run") as HTMLButtonElement;
+  if (button.textContent === "Cancelar") { resetOcclusion(); $("occlusion-status").textContent = "Cancelado."; return; }
+  if (!state.model || !state.pixels) return;
+  const run = ++occlusionRun, start = performance.now();
+  button.textContent = "Cancelar";
+  occluding = true;
+  updateButtons();
+  occlusionMap = null;
+  const model = state.model;
+  const map = await occlusion(toTensor(state.pixels), SIZE, CROP, 16, async (t) => (await model.predict(t)).calibrated,
+    (done, total) => { if (run === occlusionRun) $("occlusion-status").textContent = `Calculando: ${done} de ${total}`; },
+    () => run !== occlusionRun);
+  occluding = false;
+  updateButtons();
+  if (!map || run !== occlusionRun) return;
+  occlusionMap = map;
+  button.textContent = "Calcular mapa";
+  const top = Math.max(...Array.from(map.deltas, Math.abs));
+  $("occlusion-status").textContent =
+    `${map.deltas.length} inferencias en ${comma((performance.now() - start) / 1000, 1)} s. Probabilidad sin tapar ${percent(map.base)} %; el mayor cambio al tapar un cuadro es de ${comma(top * 100, 1)} puntos.`;
+  drawOcclusion();
+});
+
 /* ---------- Viewer: four views with a shared measuring point ---------- */
 interface Cell { canvas: HTMLCanvasElement; read: HTMLElement; error: HTMLElement; cross: HTMLElement }
 const quad = $("quad");
@@ -479,7 +583,8 @@ function renderLog() {
 }
 
 function updateButtons() {
-  ($("predict") as HTMLButtonElement).disabled = !(state.model && state.pixels);
+  ($("predict") as HTMLButtonElement).disabled = !(state.model && state.pixels) || occluding;
+  ($("occlusion-run") as HTMLButtonElement).disabled = !(state.model && state.pixels);
   ($("clear") as HTMLButtonElement).disabled = !state.pixels;
 }
 
@@ -514,6 +619,7 @@ function setSlice(pixels: Uint8ClampedArray[] | null, sampleId: string | null, e
   showResult(null);
   updateButtons();
   if (pixels) { drawPipeline(); drawField(); }
+  resetOcclusion();
 }
 
 async function handleFiles(files: File[]) {
@@ -636,6 +742,8 @@ document.fonts.ready.then(placeThumb);
 /* ---------- Start: first example on screen, model loaded and checked against Python ---------- */
 renderData();
 selectFold(0);
+renderLab();
+selectExperiment(finalRun.name);
 selectStep(0);
 renderSpec();
 renderLimits();

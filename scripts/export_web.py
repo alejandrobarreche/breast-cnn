@@ -8,7 +8,10 @@ Git), copies a few test slices into web/public/examples/ and writes web/src/mani
 model checksum and threshold, architecture, training settings, internal and test metrics,
 the patient split (fold, pCR, cohort and slices of each train patient; counts only for test),
 and the examples with the outputs ONNX Runtime gives them in Python, which the web parity
-test must reproduce.
+test must reproduce. Also writes web/src/runs.json for the experiment lab: per run, what it
+changed with respect to the reference experiment, the validation patient AUC of each fold
+(epoch chosen without the evaluated fold, or the last epoch for fixed-epoch runs, and the
+optimistic best epoch), the mean learning curves, and the cohort-only baseline.
 """
 
 import argparse
@@ -30,11 +33,21 @@ from breast_cnn.data.metadata import (
     load_samples,
     resolve_image_path,
 )
+from breast_cnn.evaluation.runs import (
+    cohort_baseline,
+    epoch_selection,
+    fold_auc,
+    load_runs,
+    patient_scores,
+)
 from breast_cnn.models import ModelConfig, build_model
 
 PHASES = ("PRE", "EARLY", "LATE")
 OUTPUTS = ("fold_probabilities", "probability", "calibrated", "fold_calibrated")
 EXAMPLES_PER_COHORT = 2
+LAB_REFERENCE = "baseline_weighted"
+# Settings that identify a run or the machine, not the experiment
+IGNORED = {"experiment", "model", "folds", "seed", "num_workers", "runs_dir", "threshold"}
 
 
 def _stages(config: ModelConfig) -> list[dict]:
@@ -79,6 +92,64 @@ def _split(samples: pd.DataFrame, cohorts: pd.Series, excluded: int) -> dict:
             "slices": int(test["slices"].sum()),
             "by_cohort": [int(test["cohort"].eq(name).sum()) for name in names],
         },
+    }
+
+
+def _settings(run: dict, defaults: dict) -> dict:
+    """Training settings (missing keys take today's defaults) and the validated architecture."""
+    train = {k: v for k, v in {**defaults, **run["train"]}.items() if k not in IGNORED}
+    model = ModelConfig.model_validate(run["model"]).model_dump()
+    return {**train, **{f"model.{k}": v for k, v in model.items()}}
+
+
+def _lab(root: Path, runs_dir: str, final_run: str, patients: pd.DataFrame) -> dict:
+    """Validation results of every finished run for the web lab; internal validation only."""
+    runs = load_runs(root / runs_dir)
+    defaults = OmegaConf.to_container(OmegaConf.load(root / "configs/config.yaml"))["train"]
+    settings = {
+        run.experiment: _settings(
+            OmegaConf.to_container(OmegaConf.load(run.directory / "config.yaml")), defaults
+        )
+        for run in runs
+    }
+    reference = settings[LAB_REFERENCE]
+    scores = patient_scores(runs[:1], patients)
+    scores["cohort_baseline"] = cohort_baseline(scores)
+    baseline = fold_auc(scores, ["cohort_baseline"])["cohort_baseline"]
+    experiments = []
+    for run in runs:
+        last = run.metrics["selection"] == "last_epoch"
+        folds = epoch_selection(run.history)
+        last_epoch = run.history.groupby("fold")["validation_patient_auc"].last()
+        honest = last_epoch.to_numpy() if last else folds["out_of_fold"].to_numpy()
+        # The first runs did not log the train AUC: their train curve is left empty
+        history = run.history.copy()
+        if "train_patient_auc" not in history:
+            history["train_patient_auc"] = float("nan")
+        curves = history.groupby("epoch")[["train_patient_auc", "validation_patient_auc"]].mean()
+        own = settings[run.experiment]
+        experiments.append(
+            {
+                "name": run.experiment,
+                "final": run.directory.resolve() == (root / final_run).resolve(),
+                "selection": "last" if last else "out_of_fold",
+                "changes": {k: v for k, v in own.items() if reference.get(k) != v},
+                "auc": [float(x) for x in honest],
+                "best_auc": folds["best"].tolist(),
+                "curves": {
+                    "epoch": curves.index.tolist(),
+                    "train": [
+                        None if pd.isna(x) else round(x, 4) for x in curves["train_patient_auc"]
+                    ],
+                    "validation": curves["validation_patient_auc"].round(4).tolist(),
+                },
+            }
+        )
+    return {
+        "reference": LAB_REFERENCE,
+        "reference_settings": reference,
+        "cohort_baseline": baseline.tolist(),
+        "experiments": experiments,
     }
 
 
@@ -187,6 +258,8 @@ def main() -> None:
         "split": _split(samples, cohorts, len(load_excluded_patients(root, data.metadata_dir))),
         "examples": examples,
     }
+    lab = _lab(root, analysis.runs_dir, analysis.final_run, load_patients(root, data.metadata_dir))
+    (web / "src/runs.json").write_text(json.dumps(lab, ensure_ascii=False) + "\n", "utf-8")
     path = web / "src/manifest.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", "utf-8")
