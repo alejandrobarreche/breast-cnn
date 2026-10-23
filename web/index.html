@@ -14,8 +14,9 @@
         <a class="brand" href="#top">Lector pCR</a>
         <nav class="nav" aria-label="Secciones">
           <span class="nav-thumb" aria-hidden="true"></span>
-          <a href="#analizar">Analizar</a>
+          <a href="#datos">Datos</a>
           <a href="#red">Arquitectura</a>
+          <a href="#analizar">Analizar</a>
           <a href="#resultados">Resultados</a>
           <a href="#limitaciones">Limitaciones</a>
         </nav>
@@ -31,7 +32,7 @@
           <h1 id="hero-title">Estimación de la respuesta patológica completa a partir de una resonancia previa al tratamiento</h1>
           <div class="hero-actions">
             <a class="btn primary" href="#analizar">Analizar un corte</a>
-            <a class="btn" href="#red">Ver la arquitectura</a>
+            <a class="btn" href="#datos">Ver el proceso</a>
           </div>
         </div>
         <div class="hero-side">
@@ -44,6 +45,83 @@
     </section>
 
     <main class="wrap">
+      <!-- Data: cohorts, patient split and the preprocessing of one slice -->
+      <section class="section" id="datos" aria-labelledby="datos-title">
+        <div class="section-head">
+          <h2 id="datos-title">Datos</h2>
+          <p id="datos-lead"></p>
+        </div>
+
+        <div class="split">
+          <figure class="figure">
+            <svg id="split" role="img" aria-label="Pacientes de entrenamiento por fold, coloreadas por clase, y pacientes de test"></svg>
+            <figcaption>Cada punto es una paciente, ordenadas por cohorte (Duke, I-SPY1, I-SPY2) y por clase: <span class="key nopcr">sin pCR</span> <span class="key pcr">pCR</span>. Las de test aparecen en gris porque su etiqueta solo interviene en la evaluación final. Pulsa una columna para usar ese fold como validación.</figcaption>
+          </figure>
+          <div class="split-side">
+            <h3>Reparto por paciente</h3>
+            <p class="prose-small">Todos los cortes de una paciente van al mismo fold. Si se repartieran, la red podría reconocer a la paciente en validación y la estimación del rendimiento sería optimista. Cada fold actúa una vez como validación mientras los otros cuatro entrenan.</p>
+            <table class="table compact" id="fold-table"></table>
+            <p class="prose-small" id="fold-weight"></p>
+            <table class="table compact" id="cohort-table"></table>
+          </div>
+        </div>
+
+        <h3 class="sub-head">Preprocesado de un corte</h3>
+        <p class="prose-small sub-lead">Se aplica al corte cargado en <a href="#analizar">Analizar</a>. Los pasos 1, 2 y 4 son idénticos en entrenamiento y en inferencia; el paso 3 solo ocurre en entrenamiento.</p>
+        <ol class="pipeline" id="pipeline">
+          <li>
+            <h4>Lectura</h4>
+            <div class="pipe-figure stack" id="pipe-read"></div>
+            <p id="pipe-read-text"></p>
+          </li>
+          <li>
+            <h4>Escala a [0, 1]</h4>
+            <div class="pipe-figure" id="pipe-scale"></div>
+            <p>Cada valor se divide entre 255 y las tres fases se apilan como canales de un tensor <code>float32 [3, 256, 256]</code>. No se normaliza cada fase por separado: la diferencia entre fases es la información.</p>
+          </li>
+          <li class="wide">
+            <h4>Aumento geométrico <span class="muted">(solo entrenamiento)</span></h4>
+            <div class="pipe-figure quad-small" id="pipe-augment"></div>
+            <div class="pipe-actions">
+              <button class="btn small" id="augment">Generar otro aumento</button>
+              <span class="muted" id="augment-params"></span>
+            </div>
+            <p id="pipe-augment-text"></p>
+          </li>
+          <li>
+            <h4>Recorte central</h4>
+            <div class="pipe-figure" id="pipe-crop"></div>
+            <p id="pipe-crop-text"></p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Network: overview and a step-by-step layer table -->
+      <section class="section" id="red" aria-labelledby="red-title">
+        <div class="section-head">
+          <h2 id="red-title">Arquitectura</h2>
+          <p>La misma red se entrena cinco veces, una por partición de validación, y la salida final es la media de las cinco probabilidades calibradas. Elige un paso para ver sus capas.</p>
+        </div>
+        <figure class="figure">
+          <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
+          <figcaption id="net-readout"></figcaption>
+        </figure>
+        <div class="stepper">
+          <div class="step-list" id="step-list" role="tablist" aria-label="Pasos de la red"></div>
+          <div class="step-body" id="step-body" role="tabpanel">
+            <div class="step-text">
+              <h3 id="step-title"></h3>
+              <p class="prose-small" id="step-explain"></p>
+              <table class="table compact" id="step-table"></table>
+            </div>
+            <figure class="figure field">
+              <canvas id="field" width="256" height="256" aria-label="Campo receptivo sobre el recorte central"></canvas>
+              <figcaption id="field-caption"></figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
       <!-- Workbench -->
       <section class="section" id="analizar" aria-labelledby="analizar-title">
         <div class="section-head">
@@ -127,19 +205,6 @@
             <tbody id="rows"></tbody>
           </table>
         </div>
-      </section>
-
-      <!-- Network -->
-      <section class="section" id="red" aria-labelledby="red-title">
-        <div class="section-head">
-          <h2 id="red-title">Arquitectura</h2>
-          <p>La misma red se entrena cinco veces, una por partición de validación, y la salida final es la media de las cinco probabilidades calibradas.</p>
-        </div>
-        <figure class="figure">
-          <div class="net-scroll"><svg id="net" role="img" aria-label="Arquitectura de la red, de las tres fases a la probabilidad de pCR"></svg></div>
-          <figcaption id="net-readout"></figcaption>
-        </figure>
-        <ol class="steps" id="steps"></ol>
       </section>
 
       <!-- Results -->

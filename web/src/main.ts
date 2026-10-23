@@ -1,11 +1,14 @@
 import "./style.css";
 import manifest from "./manifest.json";
+import { apply as augmentPhase, sample as sampleAugmentation, type Augmentation } from "./augment";
 import { drawAuc } from "./auc";
+import { steps as layerSteps } from "./layers";
 import { loadModel, type Model, type Prediction } from "./model";
 import { drawNetwork } from "./network";
 import { checkHeader, checkNames, MAX_BYTES, PHASES, SIZE, toTensor, type Phase } from "./preprocess";
 import { startHero } from "./hero";
 import { drawRuler } from "./ruler";
+import { drawSplit, positiveWeight, summarize, type Patient } from "./split";
 import { percent, thousands } from "./svg";
 import { drawUptake, kinetics, MIN_ENHANCEMENT, windowMean } from "./uptake";
 
@@ -24,6 +27,7 @@ const THRESHOLD = manifest.model.threshold;
 const BASE = import.meta.env.BASE_URL;
 const arch = manifest.architecture;
 const t = manifest.training, v = manifest.validation_slice, s = manifest.test_patient;
+const CROP = arch.input_crop ?? SIZE;
 const comma = (x: number, d = 3) => x.toFixed(d).replace(".", ",");
 // Name and corner note of the four views of the viewer
 const VIEWS: [string, string][] = [["PRE", "antes del contraste"], ["EARLY", "fase inicial"], ["LATE", "fase tardía"], ["Realce", "EARLY − PRE"]];
@@ -42,20 +46,6 @@ const state = {
 };
 
 /* ---------- Presentation and static sections ---------- */
-function renderSteps() {
-  const stageParams = arch.stages.map((x) => x.channels).join(" → ");
-  const steps: [string, string][] = [
-    ["Entrada", `Las tres fases se apilan como tres canales de 256 × 256 con valores en [0, 1]. La red usa el recorte central de ${arch.input_crop} × ${arch.input_crop}: el dataset centra cada corte en el tumor.`],
-    ["Extracción de características", `Cinco etapas de dos convoluciones 3 × 3, cada una con normalización por lotes y ReLU, seguidas de un max pooling 2 × 2. Los canales crecen ${stageParams} mientras la resolución baja de ${arch.input_crop} a ${arch.stages[arch.stages.length - 1].size}.`],
-    ["Decisión", `Un promedio global por canal, dropout de ${comma(arch.dropout, 1)} y una capa lineal dan un logit por modelo. Cada uno se calibra con el método de Platt; la media de los cinco se compara con el umbral de ${percent(THRESHOLD)} %, elegido en validación para una especificidad de al menos ${comma(manifest.model.min_specificity, 2)}.`],
-  ];
-  $("steps").replaceChildren(...steps.map(([title, body]) => {
-    const li = make("li");
-    li.append(make("h3", "", title), make("p", "", body));
-    return li;
-  }));
-}
-
 function renderSpec() {
   const sections: [string, [string, string][]][] = [
     ["Validación interna, por corte", [["Cortes", `${thousands(v.n)} (${thousands(v.positives)} pCR)`], ["AUC", comma(v.auc!)], ["Sensibilidad", comma(v.sensitivity!)], ["Especificidad", comma(v.specificity!)], ["Exactitud equilibrada", comma(v.balanced_accuracy!)]]],
@@ -88,11 +78,11 @@ function renderLimits() {
 }
 
 /* ---------- Figures ---------- */
-const netReadout = `${thousands(arch.params)} parámetros por modelo. Pasa el cursor por una etapa para ver su tamaño.`;
+const netReadout = `${thousands(arch.params)} parámetros por modelo. Pulsa una etapa para ver sus capas.`;
 $("net-readout").textContent = netReadout;
 const network = drawNetwork($("net") as unknown as SVGSVGElement, arch.stages, arch.input_crop ?? 256, arch.models, (label) => {
   $("net-readout").textContent = label ?? netReadout;
-});
+}, (stage) => selectStep(stage + 1));
 const uptake = drawUptake($("uptake") as unknown as SVGSVGElement);
 const ruler = drawRuler($("ruler") as unknown as SVGSVGElement, THRESHOLD, manifest.model.train_pcr_rate, arch.models);
 drawAuc($("auc") as unknown as SVGSVGElement, s.auc.value, s.auc.lower, s.auc.upper, s.cohort_baseline_auc);
@@ -127,10 +117,178 @@ function canvasOf(data: ImageData) {
   return canvas;
 }
 
+/* ---------- Data: cohorts and patient split ---------- */
+const split = manifest.split;
+const trainPatients = split.train as Patient[];
+const COHORT_NAMES = split.cohorts.map((c) => COHORTS[c]);
+const pct = (a: number, b: number) => `${percent(a / b)} %`;
+function renderData() {
+  const train = summarize(trainPatients);
+  const total = trainPatients.length + split.test.patients;
+  const perCohort = split.cohorts.map((_, c) => trainPatients.filter((p) => p[2] === c).length + split.test.by_cohort[c]);
+  $("datos-lead").textContent =
+    `BreastDCEDL reúne resonancias DCE de ${thousands(total)} pacientes de tres estudios: ` +
+    COHORT_NAMES.map((name, c) => `${name} (${thousands(perCohort[c])})`).join(", ").replace(/, ([^,]*)$/, " e $1") +
+    `. La versión MinCrop recorta cada corte a 256 × 256 alrededor del tumor y conserva las fases PRE, EARLY y LATE; de cada paciente se usan unos diez cortes. ` +
+    `Hay ${thousands(train.patients)} pacientes de entrenamiento, de las que el ${pct(train.positives, train.patients)} alcanzó pCR, y ${split.test.patients} de test. ` +
+    `${split.excluded_patients} pacientes Duke quedaron excluidas porque faltaba su fase tardía.`;
+  const rows = COHORT_NAMES.map((name, c) => {
+    const own = trainPatients.filter((p) => p[2] === c);
+    const s = summarize(own);
+    return [name, thousands(s.patients), pct(s.positives, s.patients), String(split.test.by_cohort[c])];
+  });
+  table($("cohort-table") as HTMLTableElement, ["Cohorte", "Train", "pCR en train", "Test"], rows);
+}
+function table(node: HTMLTableElement, head: string[], rows: string[][]) {
+  const thead = make("thead"), tr = make("tr");
+  head.forEach((h, i) => tr.append(make("th", i ? "num" : "", h)));
+  thead.append(tr);
+  const tbody = make("tbody");
+  for (const row of rows) {
+    const r = make("tr");
+    row.forEach((v, i) => r.append(make("td", i ? "num" : "", v)));
+    tbody.append(r);
+  }
+  node.replaceChildren(thead, tbody);
+}
+const splitFigure = drawSplit($("split") as unknown as SVGSVGElement, trainPatients, split.test, (fold) => selectFold(fold));
+function selectFold(fold: number) {
+  splitFigure.select(fold);
+  const train = summarize(trainPatients.filter((p) => p[0] !== fold));
+  const valid = summarize(trainPatients.filter((p) => p[0] === fold));
+  table($("fold-table") as HTMLTableElement, [`Fold ${fold + 1} como validación`, "Pacientes", "Cortes", "pCR"], [
+    ["Entrenamiento", thousands(train.patients), thousands(train.slices), pct(train.positives, train.patients)],
+    ["Validación", thousands(valid.patients), thousands(valid.slices), pct(valid.positives, valid.patients)],
+  ]);
+  $("fold-weight").textContent =
+    `Peso de la clase positiva en la pérdida: pos_weight = N0 / N1 = ${thousands(train.slices - train.positiveSlices)} / ${thousands(train.positiveSlices)} = ${comma(positiveWeight(train), 2)}, ` +
+    `calculado con los cortes de entrenamiento de este fold. Cada corte con pCR pesa ${comma(positiveWeight(train), 2)} veces más que uno sin pCR, lo que compensa que haya menos.`;
+}
+
+/* ---------- Data: preprocessing of the loaded slice ---------- */
+let augmentation: Augmentation = sampleAugmentation(t, SIZE);
+function tile(canvas: HTMLCanvasElement, label: string, crop = false) {
+  const box = make("div", "tile");
+  const copy = make("canvas");
+  copy.width = copy.height = SIZE;
+  copy.getContext("2d")!.drawImage(canvas, 0, 0);
+  box.append(copy, make("span", "corner tl", label));
+  if (crop) {
+    const frame = make("div", "crop");
+    frame.style.inset = `${((1 - CROP / SIZE) / 2) * 100}%`;
+    box.append(frame);
+  }
+  return box;
+}
+function drawPipeline() {
+  if (!state.pixels) return;
+  const [pre, early, late] = state.views;
+  $("pipe-read").replaceChildren(tile(pre, "PRE"), tile(early, "EARLY"), tile(late, "LATE"));
+  const ranges = state.pixels.map((p) => { let lo = 255, hi = 0; for (let i = 0; i < p.length; i += 4) { lo = Math.min(lo, p[i]); hi = Math.max(hi, p[i]); } return [lo, hi]; });
+  $("pipe-read-text").textContent =
+    `Tres PNG en escala de grises de 8 bits, enteros de 0 a 255 (en este corte: ${ranges.map(([lo, hi], i) => `${PHASES[i]} ${lo}–${hi}`).join(", ")}). ` +
+    `El dataset ya recortó las intensidades a los percentiles 1 y 99 con una ventana común para las tres fases, así que EARLY − PRE mide realce.`;
+  const means = state.pixels.map((p) => windowMean(p, SIZE, SIZE / 2, SIZE / 2, SIZE));
+  const scale = make("dl", "tensor");
+  PHASES.forEach((phase, i) => scale.append(make("dt", "", `Canal ${i} (${phase})`), make("dd", "", `media ${comma(means[i], 3)}`)));
+  scale.append(make("dt", "", "Forma"), make("dd", "", "[3, 256, 256]"), make("dt", "", "Tipo"), make("dd", "", "float32"));
+  $("pipe-scale").replaceChildren(scale);
+  drawAugmentation();
+  $("pipe-crop").replaceChildren(tile(state.views[3], "Realce", true));
+  $("pipe-crop-text").textContent =
+    `La primera capa de la red conserva la región central de ${CROP} × ${CROP} píxeles, donde MinCrop sitúa el tumor; el resto no se usa. ` +
+    `Al estar dentro del modelo, la entrada sigue siendo [3, 256, 256] y el recorte es idéntico en entrenamiento e inferencia.`;
+}
+function drawAugmentation() {
+  if (!state.pixels) return;
+  const phases = state.views.slice(0, 3).map((c) => augmentPhase(c, augmentation));
+  const data = phases.map((c) => c.getContext("2d")!.getImageData(0, 0, SIZE, SIZE).data);
+  const enhanced = canvasOf(enhancement(data[0], data[1]));
+  $("pipe-augment").replaceChildren(tile(phases[0], "PRE"), tile(phases[1], "EARLY"), tile(phases[2], "LATE"), tile(enhanced, "Realce"));
+  const a = augmentation;
+  const signed = (x: string) => x.replace("-", "−");
+  $("augment-params").textContent =
+    `Rotación ${signed(comma(a.angle, 1))}°, escala ${comma(a.scale, 2)}, desplazamiento (${signed(String(Math.round(a.dx)))}, ${signed(String(Math.round(a.dy)))}) px, volteo ${a.flip ? "sí" : "no"}`;
+  $("pipe-augment-text").textContent =
+    `En cada época, cada corte se gira hasta ±${t.rotation_degrees}°, se escala entre ${comma(t.scale_range[0], 1)} y ${comma(t.scale_range[1], 1)}, ` +
+    `se desplaza hasta un ${Math.round(t.max_translation * 100)} % y se voltea con probabilidad ${comma(t.horizontal_flip_probability, 1)}. ` +
+    `La misma transformación se aplica a las tres fases, de modo que el mapa de realce sigue alineado. Los bordes que quedan sin imagen valen 0.`;
+}
+$("augment").addEventListener("click", () => { augmentation = sampleAugmentation(t, SIZE); drawAugmentation(); });
+
+/* ---------- Network: step-by-step layers and receptive field ---------- */
+const STEPS = layerSteps(arch.stages, arch.kernel_size, 3, CROP, arch.models);
+const STEP_TEXT = [
+  `La red recibe las tres fases como canales. Su primera operación recorta el centro de ${CROP} × ${CROP}; no tiene parámetros.`,
+  ...arch.stages.map((stage, i) =>
+    `${["Una convolución", "Dos convoluciones", "Tres convoluciones"][stage.convs - 1] ?? `${stage.convs} convoluciones`} ${arch.kernel_size} × ${arch.kernel_size} combinan cada píxel con sus vecinos en los ${i ? arch.stages[i - 1].channels : 3} canales de entrada y producen ${stage.channels} mapas de características. ` +
+    `La normalización por lotes estabiliza la escala de las activaciones y ReLU anula los valores negativos. El max pooling reduce la resolución a la mitad, de ${stage.size} a ${stage.size / 2} píxeles, ` +
+    `y cada unidad pasa a depender de una zona mayor de la imagen.`),
+  `El promedio global resume cada uno de los ${arch.stages[arch.stages.length - 1].channels} mapas en un número. Durante el entrenamiento, el dropout anula al azar el ${Math.round(arch.dropout * 100)} % de esos valores para reducir el sobreajuste; en inferencia no actúa. Una capa lineal los combina en un logit.`,
+  `Cada uno de los ${arch.models} modelos (uno por fold) convierte su logit en probabilidad con una recta de Platt ajustada en su validación, de modo que el valor se parezca a la frecuencia real de pCR. La salida es la media de las ${arch.models} probabilidades; el umbral de ${percent(THRESHOLD)} % decide la clase.`,
+];
+const stepButtons = STEPS.map((step, i) => {
+  const button = make("button", "step-tab");
+  button.setAttribute("role", "tab");
+  button.append(make("span", "step-n", String(i + 1)), make("span", "", step.title));
+  button.addEventListener("click", () => selectStep(i));
+  $("step-list").append(button);
+  return button;
+});
+let currentStep = 0;
+$("step-list").addEventListener("keydown", (e) => {
+  const move = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+  if (!move) return;
+  e.preventDefault();
+  selectStep((currentStep + move + STEPS.length) % STEPS.length);
+  stepButtons[currentStep].focus();
+});
+function selectStep(i: number) {
+  currentStep = i;
+  stepButtons.forEach((b, k) => { b.setAttribute("aria-selected", String(k === i)); b.tabIndex = k === i ? 0 : -1; });
+  const step = STEPS[i];
+  $("step-title").textContent = step.title;
+  $("step-explain").textContent = STEP_TEXT[i];
+  const rows = step.layers.map((l) => [l.name, l.shape, l.params ? thousands(l.params) : "—"]);
+  if (step.layers.length > 1 && step.params) rows.push(["Total", "", thousands(step.params)]);
+  table($("step-table") as HTMLTableElement, ["Capa", "Salida", "Parámetros"], rows);
+  drawField();
+}
+// Receptive field of one unit at the centre of the crop, over the crop of the loaded slice
+function drawField() {
+  const step = STEPS[currentStep];
+  const canvas = $("field") as HTMLCanvasElement, ctx = canvas.getContext("2d")!;
+  const k = canvas.width / CROP, o = (SIZE - CROP) / 2;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (state.views[0]) ctx.drawImage(state.views[0], o, o, CROP, CROP, 0, 0, canvas.width, canvas.height);
+  const cells = step.outSize;
+  if (currentStep > 0 && cells > 1) {
+    ctx.strokeStyle = "rgba(232, 228, 218, 0.22)";
+    ctx.lineWidth = 1;
+    const cell = canvas.width / cells;
+    ctx.beginPath();
+    for (let c = 1; c < cells; c++) { ctx.moveTo(c * cell, 0); ctx.lineTo(c * cell, canvas.height); ctx.moveTo(0, c * cell); ctx.lineTo(canvas.width, c * cell); }
+    ctx.stroke();
+  }
+  const side = Math.min(step.field, CROP) * k, x = (canvas.width - side) / 2;
+  if (currentStep > 0) {
+    ctx.fillStyle = "rgba(255, 252, 244, 0.16)";
+    ctx.fillRect(x, x, side, side);
+    ctx.strokeStyle = "rgba(255, 252, 244, 0.95)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, x + 1, side - 2, side - 2);
+  }
+  $("field-caption").textContent = currentStep === 0
+    ? `Recorte central de ${CROP} × ${CROP} que recibe la red (fase PRE).`
+    : currentStep <= arch.stages.length
+      ? `Cuadrado: campo receptivo teórico de una unidad central, ${step.field} × ${step.field} píxeles${step.field > CROP ? `, mayor que el recorte: cada unidad puede depender de toda la imagen` : ""}. Rejilla: las ${cells} × ${cells} posiciones de salida de la etapa.`
+      : `Tras el promedio global, la decisión depende de todo el recorte de ${CROP} × ${CROP}.`;
+}
+
 /* ---------- Viewer: four views with a shared measuring point ---------- */
 interface Cell { canvas: HTMLCanvasElement; read: HTMLElement; error: HTMLElement; cross: HTMLElement }
 const quad = $("quad");
-const CROP = arch.input_crop ?? SIZE;
 const cells: Cell[] = VIEWS.map(([name, note], i) => {
   const cell = make("div", "cell");
   const canvas = make("canvas");
@@ -355,6 +513,7 @@ function setSlice(pixels: Uint8ClampedArray[] | null, sampleId: string | null, e
   drawViewer();
   showResult(null);
   updateButtons();
+  if (pixels) { drawPipeline(); drawField(); }
 }
 
 async function handleFiles(files: File[]) {
@@ -475,7 +634,9 @@ observer.observe($("top"));
 document.fonts.ready.then(placeThumb);
 
 /* ---------- Start: first example on screen, model loaded and checked against Python ---------- */
-renderSteps();
+renderData();
+selectFold(0);
+selectStep(0);
 renderSpec();
 renderLimits();
 renderLog();

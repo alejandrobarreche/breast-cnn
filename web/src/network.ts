@@ -4,6 +4,7 @@ import { el, percent, text, thousands, token } from "./svg";
 
 export interface Stage {
   channels: number;
+  convs: number;
   size: number;
   params: number;
 }
@@ -26,6 +27,7 @@ export function drawNetwork(
   crop: number,
   models: number,
   onStage: (label: string | null) => void,
+  onPick: (stage: number) => void,
 ): Network {
   svg.replaceChildren();
   const tones = [token("--t3"), token("--t4"), token("--t2")];
@@ -58,7 +60,7 @@ export function drawNetwork(
     el("rect", { x: px - 1, y: py - 1, width: sIn + 2, height: sIn + 2, fill: token("--bench"), stroke: token("--t3"), rx: 2 }, g);
     inputs[k] = el("image", { x: px, y: py, width: sIn, height: sIn, preserveAspectRatio: "none" }, g);
   }
-  caption(x + sIn / 2 + 18, "3 × 256²", PHASES.join(" · "));
+  caption(x + sIn / 2 + 18, "3 × 256²", PHASES.join(", "));
   const fraction = crop / 256;
   const cx0 = x + (sIn * (1 - fraction)) / 2, cy0 = AXIS - (sIn * fraction) / 2, cs = sIn * fraction;
   el("rect", { x: cx0, y: cy0, width: cs, height: cs, fill: "none", stroke: token("--lit"), "stroke-width": 1.2, "stroke-dasharray": "4 3" }, g);
@@ -75,7 +77,7 @@ export function drawNetwork(
   caption(x + sC / 2, `3 × ${crop}²`, "recorte central");
   x += sC + 54;
 
-  // Convolutional stages: two convolutions (two slabs), then 2 x 2 max pooling
+  // Convolutional stages: the convolutions (drawn as two slabs), then 2 x 2 max pooling
   stages.forEach((stage, i) => {
     const s = side(stage.size), d = depth(stage.channels), half = d / 2 - 2;
     link(x - 38, x);
@@ -83,10 +85,11 @@ export function drawNetwork(
     el("rect", { x: x - 6, y: AXIS - s / 2 - d * DY - 6, width: s + d * DX + 12, height: s + d * DY + 12, fill: "transparent" }, block);
     prism(block, x + (half + 4) * DX, s, half, (half + 4) * DY);
     prism(block, x, s, half);
-    const label = `Etapa ${i + 1} · ${stage.channels} × ${stage.size}² · ${thousands(stage.params)} parámetros`;
+    const label = `Etapa ${i + 1}: ${stage.channels} × ${stage.size}², ${thousands(stage.params)} parámetros`;
     block.addEventListener("pointerenter", () => onStage(label));
     block.addEventListener("pointerleave", () => onStage(null));
-    caption(x + s / 2 + (d * DX) / 2, `${stage.channels} × ${stage.size}²`, "conv ×2 · pool");
+    block.addEventListener("click", () => onPick(i));
+    caption(x + s / 2 + (d * DX) / 2, `${stage.channels} × ${stage.size}²`, `conv ×${stage.convs} y pool`);
     x += s + d * DX + 56;
   });
 

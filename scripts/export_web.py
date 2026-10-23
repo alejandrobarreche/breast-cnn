@@ -6,6 +6,7 @@
 Run after scripts/export_onnx.py. Copies the ONNX model into web/public/model/ (outside
 Git), copies a few test slices into web/public/examples/ and writes web/src/manifest.json:
 model checksum and threshold, architecture, training settings, internal and test metrics,
+the patient split (fold, pCR, cohort and slices of each train patient; counts only for test),
 and the examples with the outputs ONNX Runtime gives them in Python, which the web parity
 test must reproduce.
 """
@@ -23,7 +24,12 @@ from torch import nn
 
 from breast_cnn.configuration import load_analysis_config
 from breast_cnn.data.dataset import BreastDCEDataset
-from breast_cnn.data.metadata import load_patients, load_samples, resolve_image_path
+from breast_cnn.data.metadata import (
+    load_excluded_patients,
+    load_patients,
+    load_samples,
+    resolve_image_path,
+)
 from breast_cnn.models import ModelConfig, build_model
 
 PHASES = ("PRE", "EARLY", "LATE")
@@ -40,10 +46,40 @@ def _stages(config: ModelConfig) -> list[dict]:
         params += sum(p.numel() for p in layer.parameters())
         if isinstance(layer, nn.MaxPool2d):
             stage = config.stages[len(rows)]
-            rows.append({"channels": stage.channels, "size": size, "params": params})
+            rows.append(
+                {"channels": stage.channels, "convs": stage.convs, "size": size, "params": params}
+            )
             size //= 2
             params = 0
     return rows
+
+
+def _split(samples: pd.DataFrame, cohorts: pd.Series, excluded: int) -> dict:
+    """Patient-level split: one row per train patient and counts per cohort for test."""
+    patients = samples.groupby("patient_id").agg(
+        split=("split", "first"),
+        fold=("fold", "first"),
+        pCR=("pCR", "first"),
+        slices=("sample_id", "size"),
+    )
+    patients["cohort"] = patients.index.map(cohorts)
+    names = sorted(patients["cohort"].unique())
+    train = patients.loc[patients["split"].eq("train")].sort_values(["fold", "cohort", "pCR"])
+    test = patients.loc[patients["split"].eq("test")]
+    return {
+        "cohorts": names,
+        "excluded_patients": excluded,
+        # [fold, pCR, cohort index, slices] per train patient
+        "train": [
+            [int(r.fold), int(r.pCR), names.index(r.cohort), int(r.slices)]
+            for r in train.itertuples()
+        ],
+        "test": {
+            "patients": len(test),
+            "slices": int(test["slices"].sum()),
+            "by_cohort": [int(test["cohort"].eq(name).sum()) for name in names],
+        },
+    }
 
 
 def main() -> None:
@@ -124,6 +160,7 @@ def main() -> None:
         },
         "architecture": {
             "input_crop": model_config.input_crop,
+            "kernel_size": model_config.kernel_size,
             "stages": _stages(model_config),
             "params": sum(p.numel() for p in build_model(model_config).parameters()),
             "dropout": model_config.dropout,
@@ -136,6 +173,8 @@ def main() -> None:
             "learning_rate": train["learning_rate"],
             "epochs": train["epochs"],
             "rotation_degrees": train["rotation_degrees"],
+            "max_translation": train["max_translation"],
+            "scale_range": train["scale_range"],
             "horizontal_flip_probability": train["horizontal_flip_probability"],
         },
         "validation_slice": slice_calibration["pooled_validation"],
@@ -145,6 +184,7 @@ def main() -> None:
             "auc": test["auc"],
             "cohort_baseline_auc": test["cohort_baseline"]["auc"],
         },
+        "split": _split(samples, cohorts, len(load_excluded_patients(root, data.metadata_dir))),
         "examples": examples,
     }
     path = web / "src/manifest.json"
