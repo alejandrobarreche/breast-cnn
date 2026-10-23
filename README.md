@@ -203,6 +203,17 @@ python -m pytest
 python -m ruff check .
 ```
 
+Aplicación web (`web/`, Vite + TypeScript; el modelo se ejecuta en el navegador con ONNX Runtime Web):
+
+```bash
+python scripts/export_onnx.py       # ensemble calibrado -> artifacts/models/ensemble.onnx
+python scripts/export_web.py        # modelo, manifiesto, ejemplos y resultados de los runs para web/
+cd web && npm install && npm test   # incluye la paridad con las salidas de Python
+npm run dev                         # http://localhost:5173
+```
+
+Se publica en GitHub Pages con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v1` y comprueba su SHA-256 contra `web/src/manifest.json`.
+
 ---
 
 ## Licencia y atribución

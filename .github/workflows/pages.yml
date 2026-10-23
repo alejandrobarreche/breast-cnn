@@ -1,0 +1,58 @@
+# Build the web application and publish it on GitHub Pages.
+# The model is not in Git: it is downloaded from the GitHub Release MODEL_TAG and must match
+# the SHA-256 in web/src/manifest.json. The tests, including parity with Python, run first.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  MODEL_TAG: model-v1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Download the model from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$MODEL_TAG" --repo "$GITHUB_REPOSITORY" --pattern ensemble.onnx --dir public/model
+          echo "$(jq -r .model.sha256 src/manifest.json)  public/model/ensemble.onnx" | sha256sum --check
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
