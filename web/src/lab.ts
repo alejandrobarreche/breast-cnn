@@ -50,7 +50,7 @@ export function describe(changes: Settings, reference: Settings): string[] {
   return out;
 }
 
-const X0 = 200, X1 = 720, LO = 0.4, HI = 0.7, ROW = 26, TOP = 40;
+const X0 = 230, X1 = 760, LO = 0.4, HI = 0.7, ROW = 25, TOP = 42;
 const x = (v: number) => X0 + ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (X1 - X0);
 
 /** Dot plot: one row per experiment, sorted by honest AUC. Returns the row order. */
@@ -60,19 +60,19 @@ export function drawLab(svg: SVGSVGElement, experiments: Experiment[], baseline:
   const bottom = TOP + rows.length * ROW;
   for (let v = LO; v <= HI + 1e-9; v += 0.05) {
     el("line", { x1: x(v), y1: TOP - 10, x2: x(v), y2: bottom, stroke: token("--hair") }, svg);
-    text(svg, x(v), bottom + 20, v.toFixed(2).replace(".", ","), { "text-anchor": "middle", "font-size": 12 });
+    text(svg, x(v), bottom + 22, v.toFixed(2).replace(".", ","), { "text-anchor": "middle", "font-size": 14 });
   }
   el("line", { x1: x(0.5), y1: TOP - 14, x2: x(0.5), y2: bottom, stroke: token("--t4"), "stroke-dasharray": "3 4" }, svg);
-  text(svg, x(0.5), TOP - 20, "azar", { "text-anchor": "middle", "font-size": 12 });
+  text(svg, x(0.5), TOP - 20, "azar", { "text-anchor": "middle", "font-size": 14 });
   el("line", { x1: x(baseline), y1: TOP - 14, x2: x(baseline), y2: bottom, stroke: token("--muted"), "stroke-width": 1.5 }, svg);
-  text(svg, x(baseline) + 6, TOP - 20, `solo cohorte ${comma(baseline)}`, { "font-size": 12, fill: token("--ink") });
+  text(svg, x(baseline) + 6, TOP - 20, `solo cohorte ${comma(baseline)}`, { "font-size": 14, fill: token("--ink") });
 
   const groups = new Map<string, SVGGElement>();
   rows.forEach((e, i) => {
     const y = TOP + i * ROW + ROW / 2;
     const g = el("g", { class: `lab-row${e.final ? " final" : ""}`, tabindex: 0, role: "button", "aria-label": `${e.name}, AUC ${comma(mean(e.auc))}` }, svg);
     el("rect", { class: "lab-hit", x: 0, y: y - ROW / 2, width: X1 + 30, height: ROW, rx: 4 }, g);
-    text(g, 8, y + 4.5, e.name, { "font-size": 13.5, class: "lab-name" });
+    text(g, 8, y + 5, e.name, { "font-size": 15, class: "lab-name" });
     const m = mean(e.auc), s = std(e.auc);
     el("line", { x1: x(m - s), y1: y, x2: x(m + s), y2: y, stroke: token("--t4"), "stroke-width": 2, "stroke-linecap": "round" }, g);
     for (const v of e.auc) el("circle", { cx: x(v), cy: y, r: 2.2, fill: token("--muted"), opacity: 0.7 }, g);
@@ -82,7 +82,7 @@ export function drawLab(svg: SVGSVGElement, experiments: Experiment[], baseline:
     g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onSelect(e.name); } });
     groups.set(e.name, g);
   });
-  svg.setAttribute("viewBox", `0 0 ${X1 + 40} ${bottom + 30}`);
+  svg.setAttribute("viewBox", `0 0 ${X1 + 40} ${bottom + 34}`);
   return {
     select(name: string) { for (const [n, g] of groups) g.classList.toggle("on", n === name); },
   };
@@ -91,22 +91,22 @@ export function drawLab(svg: SVGSVGElement, experiments: Experiment[], baseline:
 /** Mean learning curves over folds: train and validation patient AUC per epoch. */
 export function drawCurves(svg: SVGSVGElement, e: Experiment, baseline: number) {
   svg.replaceChildren();
-  const W = 420, H = 220, L = 40, R = 12, T = 14, B = 28;
+  const W = 420, H = 230, L = 42, R = 12, T = 14, B = 32;
   const last = Math.max(...e.curves.epoch);
   const px = (ep: number) => L + ((ep - 1) / Math.max(1, last - 1)) * (W - L - R);
   const py = (v: number) => T + (1 - (Math.max(0.4, Math.min(1, v)) - 0.4) / 0.6) * (H - T - B);
   for (const v of [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]) {
     el("line", { x1: L, y1: py(v), x2: W - R, y2: py(v), stroke: token("--hair") }, svg);
-    text(svg, L - 6, py(v) + 4, v.toFixed(1).replace(".", ","), { "text-anchor": "end", "font-size": 11 });
+    text(svg, L - 6, py(v) + 4, v.toFixed(1).replace(".", ","), { "text-anchor": "end", "font-size": 13 });
   }
   const step = last > 20 ? 10 : last > 6 ? 2 : 1;
-  for (let ep = 1; ep <= last; ep += ep === 1 && step > 1 ? step - 1 : step) text(svg, px(ep), H - 8, String(ep), { "text-anchor": "middle", "font-size": 11 });
+  for (let ep = 1; ep <= last; ep += ep === 1 && step > 1 ? step - 1 : step) text(svg, px(ep), H - 8, String(ep), { "text-anchor": "middle", "font-size": 13 });
   el("line", { x1: L, y1: py(baseline), x2: W - R, y2: py(baseline), stroke: token("--muted"), "stroke-dasharray": "2 4" }, svg);
   const path = (values: (number | null)[]) =>
     values.map((v, i) => (v == null ? "" : `${i && values[i - 1] != null ? "L" : "M"}${px(e.curves.epoch[i])},${py(v)}`)).join(" ");
   const label = (values: (number | null)[], name: string, dy: number) => {
     const i = values.length - 1, v = values[i];
-    if (v != null) text(svg, Math.min(px(e.curves.epoch[i]), W - R) - 4, py(v) + dy, name, { "text-anchor": "end", "font-size": 12, fill: token("--ink") });
+    if (v != null) text(svg, Math.min(px(e.curves.epoch[i]), W - R) - 4, py(v) + dy, name, { "text-anchor": "end", "font-size": 14, fill: token("--ink") });
   };
   if (e.curves.train.some((v) => v != null)) {
     el("path", { d: path(e.curves.train), fill: "none", stroke: token("--muted"), "stroke-width": 1.8, "stroke-dasharray": "5 4" }, svg);

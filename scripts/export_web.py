@@ -11,7 +11,10 @@ and the examples with the outputs ONNX Runtime gives them in Python, which the w
 test must reproduce. Also writes web/src/runs.json for the experiment lab: per run, what it
 changed with respect to the reference experiment, the validation patient AUC of each fold
 (epoch chosen without the evaluated fold, or the last epoch for fixed-epoch runs, and the
-optimistic best epoch), the mean learning curves, and the cohort-only baseline.
+optimistic best epoch), the mean learning curves, and the cohort-only baseline. And writes
+web/src/results.json for the results charts: the final run's out-of-fold validation patients
+and the test patients (label, raw and calibrated mean probability), the patient threshold, and
+the per-fold history of the run whose curves fixed the number of epochs of the final model.
 """
 
 import argparse
@@ -33,6 +36,8 @@ from breast_cnn.data.metadata import (
     load_samples,
     resolve_image_path,
 )
+from breast_cnn.evaluation.calibration import fit_fold_calibration
+from breast_cnn.evaluation.final import patient_test_scores
 from breast_cnn.evaluation.runs import (
     cohort_baseline,
     epoch_selection,
@@ -46,6 +51,8 @@ PHASES = ("PRE", "EARLY", "LATE")
 OUTPUTS = ("fold_probabilities", "probability", "calibrated", "fold_calibrated")
 EXAMPLES_PER_COHORT = 2
 LAB_REFERENCE = "baseline_weighted"
+# Run whose per-fold curves fixed the number of epochs of the final model
+EPOCH_REFERENCE = "wide_crop128_slow"
 # Settings that identify a run or the machine, not the experiment
 IGNORED = {"experiment", "model", "folds", "seed", "num_workers", "runs_dir", "threshold"}
 
@@ -150,6 +157,34 @@ def _lab(root: Path, runs_dir: str, final_run: str, patients: pd.DataFrame) -> d
         "reference_settings": reference,
         "cohort_baseline": baseline.tolist(),
         "experiments": experiments,
+    }
+
+
+def _results(root: Path, analysis, calibration: dict) -> dict:
+    """Patient scores of internal validation and test, and the curves that fixed the epochs."""
+    run_dir = root / analysis.final_run
+    _, validation = fit_fold_calibration(pd.read_csv(run_dir / "predictions_validation.csv"))
+    test = patient_test_scores(pd.read_csv(root / analysis.test_predictions_path), calibration)
+    reference = next(
+        r for r in load_runs(root / analysis.runs_dir) if r.experiment == EPOCH_REFERENCE
+    )
+    columns = ["train_loss", "validation_loss", "validation_patient_auc"]
+    return {
+        "threshold": calibration["threshold"],
+        # [fold, label, raw, calibrated] per validation patient; [label, raw, calibrated] in test
+        "validation": [
+            [int(r.fold), int(r.label), float(r.probability), float(r.calibrated)]
+            for r in validation.itertuples()
+        ],
+        "test": [[int(r.label), float(r.raw), float(r.calibrated)] for r in test.itertuples()],
+        "epochs": {
+            "experiment": EPOCH_REFERENCE,
+            "chosen": int(OmegaConf.load(run_dir / "config.yaml").train.epochs),
+            "folds": [
+                {"epoch": rows["epoch"].tolist(), **{c: rows[c].round(4).tolist() for c in columns}}
+                for _, rows in reference.history.groupby("fold")
+            ],
+        },
     }
 
 
@@ -259,6 +294,9 @@ def main() -> None:
         "examples": examples,
     }
     lab = _lab(root, analysis.runs_dir, analysis.final_run, load_patients(root, data.metadata_dir))
+    calibration = json.loads((root / analysis.calibration_report_path).read_text("utf-8"))
+    results = _results(root, analysis, calibration)
+    (web / "src/results.json").write_text(json.dumps(results) + "\n", "utf-8")
     (web / "src/runs.json").write_text(json.dumps(lab, ensure_ascii=False) + "\n", "utf-8")
     path = web / "src/manifest.json"
     path.parent.mkdir(parents=True, exist_ok=True)

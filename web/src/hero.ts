@@ -28,12 +28,15 @@ const LINKS = 5; // connections drawn between two columns
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ease = (u: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
 const BONE = "232, 228, 218";
+// Colour of the travelling signal: the accent of the page (CSS --signal)
+const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
 interface Column { x: number; cy: number; side: number; sheets: number; gap: number; width: number; label: string; kind: "input" | "stage" | "vector" | "output" }
 interface Pulse { column: number; link: number; start: number }
 
 export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
   const ctx = canvas.getContext("2d")!;
+  const SIGNAL = css("--signal", "255, 252, 244");
   const font = getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim();
   let W = 0, H = 0, dpr = 1;
   let img = { x: 0, y: 0, s: 0 };
@@ -48,8 +51,8 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
     dpr = Math.min(2, devicePixelRatio || 1);
     W = box.width; H = box.height;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    // Same 1280 px grid as the rest of the page
-    const left = Math.max(40, (W - 1280) / 2 + 40), right = W - left;
+    // Same 1520 px grid as the rest of the page
+    const left = Math.max(64, (W - 1520) / 2 + 64), right = W - left;
     const s = Math.min(H * 0.72, (right - left) * 0.32);
     img = { x: left, y: (H - s) / 2 - 12, s };
     const cy = img.y + s / 2;
@@ -115,9 +118,9 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
 
   function glow(x: number, y: number, r: number, alpha: number) {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(255, 252, 244, ${alpha})`);
-    g.addColorStop(0.25, `rgba(${BONE}, ${alpha * 0.45})`);
-    g.addColorStop(1, `rgba(${BONE}, 0)`);
+    g.addColorStop(0, `rgba(${SIGNAL}, ${alpha})`);
+    g.addColorStop(0.25, `rgba(${SIGNAL}, ${alpha * 0.45})`);
+    g.addColorStop(1, `rgba(${SIGNAL}, 0)`);
     ctx.fillStyle = g;
     ctx.fillRect(x - r, y - r, 2 * r, 2 * r);
   }
@@ -272,8 +275,8 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
       const hx = x0 + (x1 - x0) * e, hy = y0 + (y1 - y0) * e;
       const tail = Math.max(0, e - 0.35);
       const grad = ctx.createLinearGradient(x0 + (x1 - x0) * tail, y0 + (y1 - y0) * tail, hx, hy);
-      grad.addColorStop(0, `rgba(${BONE}, 0)`);
-      grad.addColorStop(1, `rgba(255, 252, 244, 0.9)`);
+      grad.addColorStop(0, `rgba(${SIGNAL}, 0)`);
+      grad.addColorStop(1, `rgba(${SIGNAL}, 0.9)`);
       ctx.strokeStyle = grad;
       ctx.lineWidth = 1.6;
       ctx.beginPath();

@@ -28,11 +28,11 @@ export function drawUptake(svg: SVGSVGElement) {
   svg.replaceChildren();
   for (const v of [0, 0.5, 1]) {
     el("line", { x1: 40, y1: y(v), x2: 360, y2: y(v), stroke: token("--hair"), "stroke-width": 1 }, svg);
-    text(svg, 32, y(v) + 4, v.toFixed(1).replace(".", ","), { "text-anchor": "end", "font-size": 12 });
+    text(svg, 32, y(v) + 4, v.toFixed(1).replace(".", ","), { "text-anchor": "end", "font-size": 13.5 });
   }
-  ["PRE", "EARLY", "LATE"].forEach((name, k) => text(svg, X[k], 208, name, { "text-anchor": "middle", "font-size": 13 }));
+  ["PRE", "EARLY", "LATE"].forEach((name, k) => text(svg, X[k], 208, name, { "text-anchor": "middle", "font-size": 14.5 }));
   const reference = el("polyline", { fill: "none", stroke: token("--t4"), "stroke-width": 1.5, "stroke-dasharray": "4 4" }, svg);
-  const referenceLabel = text(svg, 0, 0, "media del recorte", { "font-size": 12, fill: token("--muted") });
+  const referenceLabel = text(svg, 0, 0, "media del recorte", { "font-size": 13.5, fill: token("--muted") });
   const curve = el("polyline", { fill: "none", stroke: token("--ink"), "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
   const dots = X.map(() => el("circle", { r: 4.5, fill: token("--ink") }, svg));
   const points = (v: number[]) => v.map((value, k) => `${X[k]},${y(value)}`).join(" ");

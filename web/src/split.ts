@@ -56,7 +56,7 @@ export function drawSplit(
     const x0 = f * (COLUMN + GAP);
     const g = el("g", { class: "fold", tabindex: 0, role: "button", "aria-label": `Usar el fold ${f + 1} como validación` }, svg);
     el("rect", { class: "fold-frame", x: x0 - 8, y: 6, width: COLUMN + 16, height: 10, rx: 4 }, g);
-    text(g, x0 + COLUMN / 2, 24, `Fold ${f + 1}`, { "text-anchor": "middle", "font-size": 13, class: "fold-label" });
+    text(g, x0 + COLUMN / 2, 24, `Fold ${f + 1}`, { "text-anchor": "middle", "font-size": 14.5, class: "fold-label" });
     place(g, patients.filter((p) => p[0] === f).map((p) => [p[2], p[1] ? pcr : nopcr]), x0);
     g.addEventListener("click", () => onSelect(f));
     g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(f); } });
@@ -65,7 +65,7 @@ export function drawSplit(
   const tx = folds * (COLUMN + GAP) + GAP;
   const divider = el("line", { x1: tx - GAP, y1: 10, x2: tx - GAP, y2: 10, stroke: token("--hair") }, svg);
   const tg = el("g", { class: "test" }, svg);
-  text(tg, tx + COLUMN / 2, 24, "Test", { "text-anchor": "middle", "font-size": 13 });
+  text(tg, tx + COLUMN / 2, 24, "Test", { "text-anchor": "middle", "font-size": 14.5 });
   place(tg, test.by_cohort.flatMap((n, c) => Array.from({ length: n }, () => [c, token("--t4")] as [number, string])), tx);
 
   for (const g of columns) g.querySelector(".fold-frame")!.setAttribute("height", String(height + 2));

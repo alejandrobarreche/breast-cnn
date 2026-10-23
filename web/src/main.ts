@@ -6,6 +6,8 @@ import { describe, drawCurves, drawLab, mean, std, type Experiment } from "./lab
 import { steps as layerSteps } from "./layers";
 import { occlusion, type OcclusionMap } from "./occlusion";
 import runs from "./runs.json";
+import results from "./results.json";
+import { auc, confusion, drawDistribution, drawEpochs, drawRoc, roc, type Confusion, type FoldHistory } from "./results";
 import { loadModel, type Model, type Prediction } from "./model";
 import { drawNetwork } from "./network";
 import { checkHeader, checkNames, MAX_BYTES, PHASES, SIZE, toTensor, type Phase } from "./preprocess";
@@ -60,22 +62,97 @@ function renderSpec() {
     const block = make("div", "spec-block");
     const dl = make("dl");
     for (const [k, value] of rows) dl.append(make("dt", "", k), make("dd", k === "SHA-256" ? "hash" : "", value));
-    block.append(make("h3", "", title), dl);
+    block.append(make("h4", "", title), dl);
     return block;
   }));
   $("auc-explain").textContent =
+    `${comma(s.auc.value)}: mejor que el azar, pero no distinguible de la referencia por cohorte (${comma(s.cohort_baseline_auc)}).`;
+  $("auc-more").textContent =
     `Un AUC de 0,5 equivale a ordenar a las pacientes al azar y 1 a separarlas sin error. ` +
-    `El modelo obtiene ${comma(s.auc.value)}; el intervalo no incluye 0,5, pero sí la referencia que solo usa la tasa de pCR de cada cohorte (${comma(s.cohort_baseline_auc)}). ` +
+    `El intervalo de confianza del 95 % (${comma(s.auc.lower)} a ${comma(s.auc.upper)}) no incluye 0,5, pero sí la referencia que solo usa la tasa de pCR de cada cohorte. ` +
     `La capacidad de discriminación es modesta.`;
+}
+
+/* ---------- Results: ROC, probability by class, confusion matrix and number of epochs ---------- */
+function renderResults() {
+  const R = results.threshold;
+  const val = results.validation as number[][], test = results.test as number[][];
+  const folds = [0, 1, 2, 3, 4].map((f) => val.filter((p) => p[0] === f));
+  const foldRoc = folds.map((rows) => roc(rows.map((p) => p[1]), rows.map((p) => p[2])));
+  const testRoc = roc(test.map((p) => p[0]), test.map((p) => p[1]));
+  drawRoc($("roc") as unknown as SVGSVGElement, foldRoc, testRoc);
+  table($("roc-table") as HTMLTableElement, ["Conjunto", "Pacientes", "pCR", "AUC"], [
+    ...folds.map((rows, f) => [`Validación, fold ${f + 1}`, thousands(rows.length), String(rows.filter((p) => p[1] === 1).length), comma(auc(foldRoc[f]))]),
+    ["Test", String(test.length), String(test.filter((p) => p[0] === 1).length), comma(auc(testRoc))],
+  ]);
+  $("roc-note").textContent =
+    `Una curva que siguiera la diagonal ordenaría a las pacientes al azar (AUC 0,5); una que pasara por la esquina superior izquierda las separaría sin error (AUC 1). ` +
+    `Las seis curvas quedan cerca de la diagonal: la capacidad de discriminación es modesta en validación y se mantiene en test.`;
+
+  const valCal = val.map((p) => p[3]), testCal = test.map((p) => p[2]);
+  const byClass = (rows: number[][], label: number, l: number, c: number) => rows.filter((p) => p[l] === label).map((p) => p[c]);
+  drawDistribution($("distribution") as unknown as SVGSVGElement, [
+    { split: "Validación", label: "sin pCR", values: byClass(val, 0, 1, 3), positive: false },
+    { split: "Validación", label: "pCR", values: byClass(val, 1, 1, 3), positive: true },
+    { split: "Test", label: "sin pCR", values: byClass(test, 0, 0, 2), positive: false },
+    { split: "Test", label: "pCR", values: byClass(test, 1, 0, 2), positive: true },
+  ], R);
+  const range = (v: number[]) => `${comma(Math.min(...v))} a ${comma(Math.max(...v))}`;
+  const notes: [string, string][] = [
+    ["Solapamiento.", "Las dos clases ocupan casi el mismo intervalo: la probabilidad estimada apenas separa a las pacientes con pCR de las que no la alcanzan."],
+    ["Umbral.", `${comma(R, 3)}, fijado en validación como el menor valor con una especificidad de al menos el ${percent(manifest.model.min_specificity)} %. Una paciente se clasifica como pCR si su probabilidad lo alcanza.`],
+    ["Validación frente a test.", `En validación cada paciente recibe la probabilidad de un único modelo (el de su fold), entre ${range(valCal)}. En test es la media de los cinco modelos, entre ${range(testCal)}. ` +
+      `Promediar reduce la dispersión, por lo que casi ninguna paciente de test alcanza un umbral fijado sobre las puntuaciones de un solo modelo; es la explicación más probable de la sensibilidad nula en test.`],
+  ];
+  $("distribution-notes").replaceChildren(...notes.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
+
+  const valCm = confusion(val.map((p) => p[1]), valCal, R), testCm = confusion(test.map((p) => p[0]), testCal, R);
+  $("confusion-lead").textContent = `Con el umbral de ${comma(R, 3)} sobre la probabilidad calibrada por paciente. Validación: los cinco folds fuera de muestra, juntos.`;
+  renderConfusion($("confusion-validation"), "Validación interna", valCm);
+  renderConfusion($("confusion-test"), "Test", testCm);
+}
+function renderConfusion(node: HTMLElement, title: string, c: Confusion) {
+  const n = c.tp + c.fn + c.tn + c.fp;
+  const cell = (count: number, row: number, hit: boolean) => {
+    const div = make("div", hit ? "hit" : "miss");
+    div.append(make("b", "", thousands(count)), make("small", "", `${percent(count / row)} % de la fila`));
+    return div;
+  };
+  const grid = make("div", "cm");
+  grid.append(
+    make("span"), make("span", "", "Predicho sin pCR"), make("span", "", "Predicho pCR"),
+    make("span", "row", "Real sin pCR"), cell(c.tn, c.tn + c.fp, true), cell(c.fp, c.tn + c.fp, false),
+    make("span", "row", "Real pCR"), cell(c.fn, c.tp + c.fn, false), cell(c.tp, c.tp + c.fn, true),
+  );
+  node.replaceChildren(
+    make("h4", "", `${title}, ${thousands(n)} pacientes`), grid,
+    make("p", "", `Sensibilidad ${comma(c.tp / (c.tp + c.fn))}, especificidad ${comma(c.tn / (c.tn + c.fp))}, exactitud equilibrada ${comma((c.tp / (c.tp + c.fn) + c.tn / (c.tn + c.fp)) / 2)}.`),
+  );
+}
+function renderEpochs() {
+  const e = results.epochs, folds = e.folds as FoldHistory[];
+  const common = Math.min(...folds.map((f) => f.epoch.length));
+  const meanAuc = folds[0].epoch.slice(0, common).map((_, i) => mean(folds.map((f) => f.validation_patient_auc[i])));
+  const meanLoss = folds[0].epoch.slice(0, common).map((_, i) => mean(folds.map((f) => f.validation_loss[i])));
+  const peak = meanAuc.indexOf(Math.max(...meanAuc)) + 1, lowest = meanLoss.indexOf(Math.min(...meanLoss)) + 1;
+  drawEpochs($("epochs-loss") as unknown as SVGSVGElement, folds, "validation_loss", e.chosen, 0.4, true);
+  drawEpochs($("epochs-auc") as unknown as SVGSVGElement, folds, "validation_patient_auc", e.chosen, 0.1);
+  $("epochs-lead").textContent = `${e.experiment} entrenó con parada temprana; el modelo final repite su configuración con ${e.chosen} épocas fijas.`;
+  const notes: [string, string][] = [
+    ["Sobreajuste.", `La pérdida de entrenamiento baja en cada época, mientras que la de validación alcanza su mínimo en la época ${lowest} y después crece: a partir de ahí la red se ajusta a particularidades de las pacientes de entrenamiento que no se generalizan.`],
+    ["Elección.", `La AUC media de los cinco folds es máxima en la época ${peak} (${comma(meanAuc[peak - 1], 3)}). Las medias usan las épocas que alcanzaron todos los folds; la parada temprana corta cada fold en una época distinta.`],
+    ["Alcance.", `El pico es pequeño frente a la variación entre folds, y al reentrenar con ${e.chosen} épocas la AUC media fue ${comma(mean(finalRun.auc), 3)}: el máximo no se reprodujo.`],
+  ];
+  $("epochs-notes").replaceChildren(...notes.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
 }
 
 function renderLimits() {
   const items = [
-    `Discriminación modesta: AUC de ${comma(s.auc.value)} en test, con un intervalo de ${comma(s.auc.lower)} a ${comma(s.auc.upper)}.`,
-    `Con el umbral elegido, la sensibilidad en validación es ${comma(v.sensitivity!)}: la mayoría de los casos con pCR se clasifican como «sin pCR».`,
-    "Cada predicción usa un único corte 2D, no el volumen completo de la resonancia ni datos clínicos como el subtipo tumoral.",
-    "Las cinco muestras de la defensa sirven para comprobar que la aplicación funciona con datos nuevos, no para estimar su rendimiento.",
-    "No hay validación prospectiva ni externa: el resultado no debe influir en ninguna decisión clínica.",
+    `Discriminación modesta: AUC ${comma(s.auc.value)} en test (IC 95 % ${comma(s.auc.lower)} a ${comma(s.auc.upper)}).`,
+    `Con el umbral elegido, la mayoría de los casos con pCR se clasifican como «sin pCR» (sensibilidad ${comma(v.sensitivity!, 2)}).`,
+    "Un único corte 2D, sin el volumen completo ni datos clínicos.",
+    "Cinco muestras comprueban que la aplicación funciona, no su rendimiento.",
+    "Uso educativo, sin validez clínica: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.",
   ];
   $("limits").replaceChildren(...items.map((text) => make("li", "", text)));
 }
@@ -130,6 +207,9 @@ function renderData() {
   const total = trainPatients.length + split.test.patients;
   const perCohort = split.cohorts.map((_, c) => trainPatients.filter((p) => p[2] === c).length + split.test.by_cohort[c]);
   $("datos-lead").textContent =
+    `${thousands(total)} pacientes de tres estudios, unos diez cortes de 256 × 256 por paciente, centrados en el tumor. ` +
+    `El ${pct(train.positives, train.patients)} de las pacientes de entrenamiento alcanzó pCR.`;
+  $("datos-more").textContent =
     `BreastDCEDL reúne resonancias DCE de ${thousands(total)} pacientes de tres estudios: ` +
     COHORT_NAMES.map((name, c) => `${name} (${thousands(perCohort[c])})`).join(", ").replace(/, ([^,]*)$/, " e $1") +
     `. La versión MinCrop recorta cada corte a 256 × 256 alrededor del tumor y conserva las fases PRE, EARLY y LATE; de cada paciente se usan unos diez cortes. ` +
@@ -164,8 +244,10 @@ function selectFold(fold: number) {
     ["Validación", thousands(valid.patients), thousands(valid.slices), pct(valid.positives, valid.patients)],
   ]);
   $("fold-weight").textContent =
-    `Peso de la clase positiva en la pérdida: pos_weight = N0 / N1 = ${thousands(train.slices - train.positiveSlices)} / ${thousands(train.positiveSlices)} = ${comma(positiveWeight(train), 2)}, ` +
-    `calculado con los cortes de entrenamiento de este fold. Cada corte con pCR pesa ${comma(positiveWeight(train), 2)} veces más que uno sin pCR, lo que compensa que haya menos.`;
+    `pos_weight = ${thousands(train.slices - train.positiveSlices)} / ${thousands(train.positiveSlices)} = ${comma(positiveWeight(train), 2)}`;
+  $("fold-weight-more").textContent =
+    `Peso de la clase positiva en la pérdida, N0 / N1: cortes sin pCR entre cortes con pCR, contados solo con los cortes de entrenamiento de este fold. ` +
+    `Cada corte con pCR pesa ${comma(positiveWeight(train), 2)} veces más que uno sin pCR, lo que compensa que haya menos.`;
 }
 
 /* ---------- Data: preprocessing of the loaded slice ---------- */
@@ -222,13 +304,11 @@ $("augment").addEventListener("click", () => { augmentation = sampleAugmentation
 /* ---------- Network: step-by-step layers and receptive field ---------- */
 const STEPS = layerSteps(arch.stages, arch.kernel_size, 3, CROP, arch.models);
 const STEP_TEXT = [
-  `La red recibe las tres fases como canales. Su primera operación recorta el centro de ${CROP} × ${CROP}; no tiene parámetros.`,
+  `Recorte central de ${CROP} × ${CROP}; sin parámetros.`,
   ...arch.stages.map((stage, i) =>
-    `${["Una convolución", "Dos convoluciones", "Tres convoluciones"][stage.convs - 1] ?? `${stage.convs} convoluciones`} ${arch.kernel_size} × ${arch.kernel_size} combinan cada píxel con sus vecinos en los ${i ? arch.stages[i - 1].channels : 3} canales de entrada y producen ${stage.channels} mapas de características. ` +
-    `La normalización por lotes estabiliza la escala de las activaciones y ReLU anula los valores negativos. El max pooling reduce la resolución a la mitad, de ${stage.size} a ${stage.size / 2} píxeles, ` +
-    `y cada unidad pasa a depender de una zona mayor de la imagen.`),
-  `El promedio global resume cada uno de los ${arch.stages[arch.stages.length - 1].channels} mapas en un número. Durante el entrenamiento, el dropout anula al azar el ${Math.round(arch.dropout * 100)} % de esos valores para reducir el sobreajuste; en inferencia no actúa. Una capa lineal los combina en un logit.`,
-  `Cada uno de los ${arch.models} modelos (uno por fold) convierte su logit en probabilidad con una recta de Platt ajustada en su validación, de modo que el valor se parezca a la frecuencia real de pCR. La salida es la media de las ${arch.models} probabilidades; el umbral de ${percent(THRESHOLD)} % decide la clase.`,
+    `${stage.convs} convoluciones ${arch.kernel_size} × ${arch.kernel_size}: ${i ? arch.stages[i - 1].channels : 3} → ${stage.channels} mapas. Max pooling: ${stage.size} → ${stage.size / 2} píxeles.`),
+  `Promedio global de los ${arch.stages[arch.stages.length - 1].channels} mapas, dropout ${comma(arch.dropout, 1)} (solo en entrenamiento) y una capa lineal: un logit.`,
+  `Platt en cada uno de los ${arch.models} modelos, media de las probabilidades y umbral de ${percent(THRESHOLD)} %.`,
 ];
 const stepButtons = STEPS.map((step, i) => {
   const button = make("button", "step-tab");
@@ -283,10 +363,10 @@ function drawField() {
     ctx.strokeRect(x + 1, x + 1, side - 2, side - 2);
   }
   $("field-caption").textContent = currentStep === 0
-    ? `Recorte central de ${CROP} × ${CROP} que recibe la red (fase PRE).`
+    ? `Recorte de ${CROP} × ${CROP} (PRE).`
     : currentStep <= arch.stages.length
-      ? `Cuadrado: campo receptivo teórico de una unidad central, ${step.field} × ${step.field} píxeles${step.field > CROP ? `, mayor que el recorte: cada unidad puede depender de toda la imagen` : ""}. Rejilla: las ${cells} × ${cells} posiciones de salida de la etapa.`
-      : `Tras el promedio global, la decisión depende de todo el recorte de ${CROP} × ${CROP}.`;
+      ? `Campo receptivo: ${step.field} × ${step.field} px${step.field > CROP ? `, más que el recorte` : ""}.`
+      : `La decisión depende de todo el recorte.`;
 }
 
 /* ---------- Lab: every training run on the internal validation ---------- */
@@ -298,9 +378,7 @@ function renderLab() {
   const honest = experiments.map((e) => mean(e.auc));
   const optimism = experiments.map((e) => mean(e.best_auc) - mean(e.auc));
   const spread = experiments.map((e) => std(e.auc));
-  $("lab-lead").textContent =
-    `${experiments.length} entrenamientos con validación cruzada por paciente en cinco folds. Cada uno cambia uno o varios factores respecto a la referencia (${runs.reference}). ` +
-    `La métrica es el AUC por paciente: la probabilidad de que una paciente con pCR reciba una puntuación mayor que una sin pCR.`;
+  $("lab-lead").textContent = `${experiments.length} entrenamientos con validación cruzada por paciente, ordenados por AUC.`;
   const notes: [string, string][] = [
     ["Lo que permiten concluir",
       `Los experimentos obtienen entre ${comma(Math.min(...honest))} y ${comma(Math.max(...honest))}, y la desviación entre folds de cada uno va de ${comma(Math.min(...spread), 2)} a ${comma(Math.max(...spread), 2)}. ` +
@@ -314,11 +392,10 @@ function renderLab() {
       `Al reentrenarlo obtuvo ${comma(mean(finalRun.auc))}: el pico de ${comma(mean(experiments.find((e) => e.name === "wide_crop128_slow")!.auc))} no se reprodujo. ` +
       `El conjunto de test no intervino en ninguna de estas decisiones.`],
   ];
-  $("lab-notes").replaceChildren(...notes.map(([title, body]) => {
-    const div = make("div");
-    div.append(make("h3", "", title), make("p", "", body));
-    return div;
-  }));
+  notes.unshift(["Métrica",
+    `AUC por paciente: la probabilidad de que una paciente con pCR reciba una puntuación mayor que una sin pCR. Cada experimento cambia uno o varios factores respecto a la referencia (${runs.reference}). ` +
+    `Cada fold se lee en la época que maximiza la curva media de los otros cuatro; el círculo hueco elige la mejor época en el propio fold y es optimista.`]);
+  $("lab-notes").replaceChildren(...notes.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title}. `), body); return p; }));
 }
 function selectExperiment(name: string) {
   const e = experiments.find((x) => x.name === name)!;
@@ -332,10 +409,9 @@ function selectExperiment(name: string) {
   ]);
   drawCurves($("curves") as unknown as SVGSVGElement, e, cohortBaseline);
   const hasTrain = e.curves.train.some((v) => v != null);
-  $("curves-caption").textContent =
-    `AUC por paciente, media de los folds en cada época. ` +
-    (hasTrain ? "La distancia entre entrenamiento (discontinua) y validación (continua) mide el sobreajuste. " : "Este run no registró el AUC de entrenamiento. ") +
-    "La línea de puntos es la referencia por cohorte.";
+  $("curves-caption").textContent = hasTrain
+    ? "Discontinua: entrenamiento. Continua: validación."
+    : "Continua: validación. Este run no registró el AUC de entrenamiento.";
 }
 
 /* ---------- Occlusion map of the loaded slice ---------- */
@@ -459,10 +535,10 @@ function drawProbe() {
   uptake.set(values, pixels.map(cropMean));
   const { pattern, delayed } = kinetics(values[0], values[1], values[2]);
   const where = state.pinned
-    ? `Punto fijado en (${probe.x}, ${probe.y}). Haz clic de nuevo para soltarlo.`
+    ? `Punto fijado (${probe.x}, ${probe.y}). Clic para soltarlo.`
     : probe === state.auto
-      ? `Punto de mayor realce del recorte central, en (${probe.x}, ${probe.y}). Pasa el cursor por la imagen para medir otro.`
-      : `Punto (${probe.x}, ${probe.y}). Haz clic para fijarlo.`;
+      ? `Punto de mayor realce (${probe.x}, ${probe.y}). Pasa el cursor para medir otro.`
+      : `Punto (${probe.x}, ${probe.y}). Clic para fijarlo.`;
   const change = `${delayed >= 0 ? "sube" : "baja"} un ${percent(Math.abs(delayed))} % respecto a EARLY`;
   const verdict =
     pattern === "sin realce"
@@ -746,6 +822,8 @@ renderLab();
 selectExperiment(finalRun.name);
 selectStep(0);
 renderSpec();
+renderResults();
+renderEpochs();
 renderLimits();
 renderLog();
 drawViewer();
