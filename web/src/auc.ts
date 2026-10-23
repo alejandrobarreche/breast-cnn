@@ -25,7 +25,7 @@ export function drawAuc(svg: SVGSVGElement, value: number, lower: number, upper:
   // Model: interval and point
   el("line", { x1: x(lower), y1: MODEL, x2: x(upper), y2: MODEL, stroke: token("--ink"), "stroke-width": 3, "stroke-linecap": "round" }, svg);
   for (const v of [lower, upper]) el("line", { x1: x(v), y1: MODEL - 8, x2: x(v), y2: MODEL + 8, stroke: token("--ink"), "stroke-width": 2 }, svg);
-  el("circle", { cx: x(value), cy: MODEL, r: 7, fill: token("--lit"), stroke: token("--surface"), "stroke-width": 2 }, svg);
+  el("circle", { cx: x(value), cy: MODEL, r: 7, fill: token("--lit"), stroke: token("--bench"), "stroke-width": 2 }, svg);
   text(svg, x(value), MODEL - 18, `modelo ${comma(value)}`, { "text-anchor": "middle", "font-size": 14, fill: token("--ink") });
   text(svg, x(upper) + 12, MODEL + 5, "IC 95 %", { "font-size": 13 });
 

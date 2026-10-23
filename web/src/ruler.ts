@@ -26,12 +26,12 @@ export function drawRuler(svg: SVGSVGElement, threshold: number, trainRate: numb
   el("line", { x1: rx(threshold), y1: BAR - 46, x2: rx(threshold), y2: BAR + 8, stroke: token("--ink"), "stroke-width": 2 }, svg);
   text(svg, rx(threshold) + 6, BAR - 38, "umbral", { "font-size": 13, fill: token("--ink") });
   el("path", { d: `M${rx(trainRate)} ${BAR + 8} l-5 8 h10 z`, fill: token("--muted") }, svg);
-  text(svg, rx(trainRate), BAR + 54, "pCR en train", { "text-anchor": "middle", "font-size": 12, fill: token("--t4") });
+  text(svg, rx(trainRate), BAR + 54, "pCR en train", { "text-anchor": "middle", "font-size": 12, fill: token("--muted") });
 
   const dots = Array.from({ length: models }, () => el("circle", { cx: rx(0), cy: BAR - 16, r: 4, fill: token("--t4"), opacity: 0 }, svg));
   const marker = el("g", { opacity: 0 }, svg);
   el("line", { x1: 0, y1: BAR - 14, x2: 0, y2: BAR + 14, stroke: token("--lit"), "stroke-width": 3, "stroke-linecap": "round" }, marker);
-  el("circle", { cx: 0, cy: BAR, r: 6.5, fill: token("--lit"), stroke: token("--surface"), "stroke-width": 2 }, marker);
+  el("circle", { cx: 0, cy: BAR, r: 6.5, fill: token("--lit"), stroke: token("--bench"), "stroke-width": 2 }, marker);
 
   const movers: Mover[] = [
     ...dots.map((dot) => ({ x: rx(0), v: 0, target: rx(0), apply: (x: number) => dot.setAttribute("cx", String(x)) })),

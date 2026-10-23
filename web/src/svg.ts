@@ -22,7 +22,7 @@ export function text(
   content: string,
   attrs: Record<string, string | number> = {},
 ): SVGTextElement {
-  const node = el("text", { x, y, "font-family": token("--font-mono"), "font-size": 15, fill: token("--muted"), ...attrs }, parent);
+  const node = el("text", { x, y, "font-family": token("--font-ui"), "font-size": 15, fill: token("--muted"), ...attrs }, parent);
   node.textContent = content;
   return node;
 }

@@ -4,8 +4,10 @@ import { drawAuc } from "./auc";
 import { loadModel, type Model, type Prediction } from "./model";
 import { drawNetwork } from "./network";
 import { checkHeader, checkNames, MAX_BYTES, PHASES, SIZE, toTensor, type Phase } from "./preprocess";
+import { startHero } from "./hero";
 import { drawRuler } from "./ruler";
 import { percent, thousands } from "./svg";
+import { drawUptake, kinetics, MIN_ENHANCEMENT, windowMean } from "./uptake";
 
 type Example = (typeof manifest.examples)[number];
 interface Entry { time: Date; sampleId: string; probability: number; threshold: number; positive: boolean; label: number | null }
@@ -23,39 +25,23 @@ const BASE = import.meta.env.BASE_URL;
 const arch = manifest.architecture;
 const t = manifest.training, v = manifest.validation_slice, s = manifest.test_patient;
 const comma = (x: number, d = 3) => x.toFixed(d).replace(".", ",");
-const VIEWS = ["PRE", "EARLY", "LATE", "Realce"];
-const VIEW_TEXT = [
-  "PRE: imagen adquirida antes de inyectar el contraste. Sirve de referencia para medir cuánto cambia cada tejido.",
-  "EARLY: poco después de la inyección. Los tejidos con mucha vascularización, como suele serlo el tumor, captan contraste pronto y se ven más brillantes.",
-  "LATE: más tarde. Compararla con EARLY indica si el tejido sigue captando contraste, lo mantiene o lo pierde (lavado).",
-  "Realce: diferencia EARLY − PRE coloreada sobre PRE. La opacidad crece con la diferencia; donde no hay cambio se ve PRE.",
-];
+// Name and corner note of the four views of the viewer
+const VIEWS: [string, string][] = [["PRE", "antes del contraste"], ["EARLY", "fase inicial"], ["LATE", "fase tardía"], ["Realce", "EARLY − PRE"]];
 
 const state = {
   model: null as Model | null,
+  modelError: null as string | null,
   pixels: null as Uint8ClampedArray[] | null,
   views: [] as HTMLCanvasElement[],
-  view: 0,
+  probe: null as { x: number; y: number } | null,
+  auto: null as { x: number; y: number } | null,
+  pinned: false,
   sampleId: null as string | null,
   example: null as Example | null,
   log: [] as Entry[],
 };
 
 /* ---------- Presentation and static sections ---------- */
-function renderStats() {
-  const items: [string, string][] = [
-    [thousands(arch.params), "parámetros por modelo"],
-    [String(arch.models), "modelos, uno por fold"],
-    [comma(s.auc.value), `AUC en test · IC 95 % ${comma(s.auc.lower)} – ${comma(s.auc.upper)}`],
-    [String(s.patients), `pacientes de test, ${s.positives} con pCR`],
-  ];
-  $("stats").replaceChildren(...items.map(([value, text]) => {
-    const div = make("div");
-    div.append(make("dd", "", value), make("dt", "", text));
-    return div;
-  }));
-}
-
 function renderSteps() {
   const stageParams = arch.stages.map((x) => x.channels).join(" → ");
   const steps: [string, string][] = [
@@ -63,26 +49,26 @@ function renderSteps() {
     ["Extracción de características", `Cinco etapas de dos convoluciones 3 × 3, cada una con normalización por lotes y ReLU, seguidas de un max pooling 2 × 2. Los canales crecen ${stageParams} mientras la resolución baja de ${arch.input_crop} a ${arch.stages[arch.stages.length - 1].size}.`],
     ["Decisión", `Un promedio global por canal, dropout de ${comma(arch.dropout, 1)} y una capa lineal dan un logit por modelo. Cada uno se calibra con el método de Platt; la media de los cinco se compara con el umbral de ${percent(THRESHOLD)} %, elegido en validación para una especificidad de al menos ${comma(manifest.model.min_specificity, 2)}.`],
   ];
-  $("steps").replaceChildren(...steps.map(([title, body], i) => {
+  $("steps").replaceChildren(...steps.map(([title, body]) => {
     const li = make("li");
-    li.append(make("span", "label", `Paso ${i + 1}`), make("h3", "", title), make("p", "", body));
+    li.append(make("h3", "", title), make("p", "", body));
     return li;
   }));
 }
 
 function renderSpec() {
   const sections: [string, [string, string][]][] = [
-    ["Validación interna · corte", [["Cortes", `${thousands(v.n)} (${thousands(v.positives)} pCR)`], ["AUC", comma(v.auc!)], ["Sensibilidad", comma(v.sensitivity!)], ["Especificidad", comma(v.specificity!)], ["Exactitud equilibrada", comma(v.balanced_accuracy!)]]],
-    ["Test · paciente", [["Pacientes", `${s.patients} (${s.positives} pCR)`], ["AUC", comma(s.auc.value)], ["IC 95 % (bootstrap)", `${comma(s.auc.lower)} – ${comma(s.auc.upper)}`], ["Solo cohorte", comma(s.cohort_baseline_auc)]]],
+    ["Validación interna, por corte", [["Cortes", `${thousands(v.n)} (${thousands(v.positives)} pCR)`], ["AUC", comma(v.auc!)], ["Sensibilidad", comma(v.sensitivity!)], ["Especificidad", comma(v.specificity!)], ["Exactitud equilibrada", comma(v.balanced_accuracy!)]]],
+    ["Test, por paciente", [["Pacientes", `${s.patients} (${s.positives} pCR)`], ["AUC", comma(s.auc.value)], ["IC 95 % (bootstrap)", `${comma(s.auc.lower)} – ${comma(s.auc.upper)}`], ["Solo cohorte", comma(s.cohort_baseline_auc)]]],
     ["Entrenamiento", [["Pérdida", t.loss], ["Optimizador", `${t.optimizer === "adamw" ? "AdamW" : t.optimizer}, lr ${String(t.learning_rate).replace(".", ",")}`], ["Épocas", `${t.epochs} fijas`], ["Rotación", `±${t.rotation_degrees}°`], ["Volteo horizontal", `p = ${comma(t.horizontal_flip_probability, 1)}`], ["Dropout", comma(arch.dropout, 1)]]],
     ["Modelo", [["Formato", "ONNX"], ["Modelos", "5 folds + Platt"], ["Tamaño", `${comma(manifest.model.bytes / 1e6, 1)} MB`], ["Experimento", t.experiment], ["SHA-256", manifest.model.sha256]]],
   ];
   $("spec").replaceChildren(...sections.map(([title, rows]) => {
-    const card = make("article", "card spec-card");
+    const block = make("div", "spec-block");
     const dl = make("dl");
     for (const [k, value] of rows) dl.append(make("dt", "", k), make("dd", k === "SHA-256" ? "hash" : "", value));
-    card.append(make("h3", "title", title), dl);
-    return card;
+    block.append(make("h3", "", title), dl);
+    return block;
   }));
   $("auc-explain").textContent =
     `Un AUC de 0,5 equivale a ordenar a las pacientes al azar y 1 a separarlas sin error. ` +
@@ -102,10 +88,12 @@ function renderLimits() {
 }
 
 /* ---------- Figures ---------- */
-$("net-readout").textContent = `${thousands(arch.params)} parámetros por modelo`;
+const netReadout = `${thousands(arch.params)} parámetros por modelo. Pasa el cursor por una etapa para ver su tamaño.`;
+$("net-readout").textContent = netReadout;
 const network = drawNetwork($("net") as unknown as SVGSVGElement, arch.stages, arch.input_crop ?? 256, arch.models, (label) => {
-  $("net-readout").textContent = label ?? `${thousands(arch.params)} parámetros por modelo`;
+  $("net-readout").textContent = label ?? netReadout;
 });
+const uptake = drawUptake($("uptake") as unknown as SVGSVGElement);
 const ruler = drawRuler($("ruler") as unknown as SVGSVGElement, THRESHOLD, manifest.model.train_pcr_rate, arch.models);
 drawAuc($("auc") as unknown as SVGSVGElement, s.auc.value, s.auc.lower, s.auc.upper, s.cohort_baseline_auc);
 $("f-threshold").textContent = `${percent(THRESHOLD)} %`;
@@ -139,57 +127,126 @@ function canvasOf(data: ImageData) {
   return canvas;
 }
 
-/* ---------- Viewer ---------- */
-const seg = $("seg");
-const segButtons = [...seg.querySelectorAll<HTMLButtonElement>("button")];
-function cropBox() {
-  const box = make("div", "crop");
-  const side = ((arch.input_crop ?? SIZE) / SIZE) * 100;
-  box.style.inset = `${(100 - side) / 2}%`;
-  box.append(make("span", "", `${arch.input_crop} × ${arch.input_crop}`));
-  return box;
+/* ---------- Viewer: four views with a shared measuring point ---------- */
+interface Cell { canvas: HTMLCanvasElement; read: HTMLElement; error: HTMLElement; cross: HTMLElement }
+const quad = $("quad");
+const CROP = arch.input_crop ?? SIZE;
+const cells: Cell[] = VIEWS.map(([name, note], i) => {
+  const cell = make("div", "cell");
+  const canvas = make("canvas");
+  canvas.width = canvas.height = SIZE;
+  const cross = make("div", "cross");
+  const crop = make("div", "crop");
+  crop.style.inset = `${((1 - CROP / SIZE) / 2) * 100}%`;
+  const read = make("span", "corner br");
+  const error = make("span", "cell-error");
+  cell.append(canvas, crop, cross, make("span", "corner tl", name), make("span", "corner tr", note), read, error);
+  if (i === 0) cell.append(make("span", "corner bl slice-id", ""));
+  quad.append(cell);
+  return { canvas, read, error, cross };
+});
+
+const comma2 = (x: number) => x.toFixed(2).replace(".", ",");
+// Brightest 5 x 5 enhancement inside the central crop: the starting point of the curve
+function strongestEnhancement(pre: Uint8ClampedArray, early: Uint8ClampedArray) {
+  const lo = (SIZE - CROP) / 2 + 2, hi = (SIZE + CROP) / 2 - 3;
+  let best = { x: SIZE / 2, y: SIZE / 2 }, top = -Infinity;
+  for (let y = lo; y <= hi; y += 2)
+    for (let x = lo; x <= hi; x += 2) {
+      const d = windowMean(early, SIZE, x, y) - windowMean(pre, SIZE, x, y);
+      if (d > top) { top = d; best = { x, y }; }
+    }
+  return best;
 }
+function cropMean(pixels: Uint8ClampedArray) {
+  const r = CROP / 2 - 1;
+  return windowMean(pixels, SIZE, SIZE / 2, SIZE / 2, r);
+}
+
 function drawViewer(errors: Partial<Record<string, string>> = {}) {
-  const main = $("main-view"), thumbs = $("thumbs");
-  main.replaceChildren();
-  thumbs.replaceChildren();
-  if (state.views.length) {
-    const big = canvasOf(state.views[state.view].getContext("2d")!.getImageData(0, 0, SIZE, SIZE));
-    big.setAttribute("aria-label", `Vista ${VIEWS[state.view]} del corte ${state.sampleId}`);
-    main.append(big, cropBox());
-  } else {
-    main.append(make("div", "empty-view", "Sin corte cargado"));
-  }
-  VIEWS.forEach((name, i) => {
-    const button = make("button", "thumb");
-    button.setAttribute("aria-pressed", String(i === state.view));
-    if (state.views[i]) button.append(state.views[i]);
-    else button.append(make("div", "empty"));
-    const caption = make("span", "label", name);
-    button.append(caption);
-    if (errors[name]) button.append(make("span", "err", errors[name]!));
-    button.addEventListener("click", () => setView(i));
-    thumbs.append(button);
+  cells.forEach((cell, i) => {
+    const context = cell.canvas.getContext("2d")!;
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, SIZE, SIZE);
+    if (state.views[i]) context.drawImage(state.views[i], 0, 0);
+    cell.canvas.setAttribute("aria-label", `${VIEWS[i][0]} del corte ${state.sampleId ?? "sin cargar"}`);
+    cell.error.textContent = errors[VIEWS[i][0]] ?? "";
   });
-  $("legend").classList.toggle("on", state.view === 3);
-  $("view-explain").textContent = VIEW_TEXT[state.view];
+  quad.classList.toggle("empty", !state.views.length);
+  quad.querySelector(".slice-id")!.textContent = state.sampleId ?? "Sin corte cargado";
+  drawProbe();
 }
-function setView(i: number) {
-  state.view = i;
-  segButtons.forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
-  seg.style.setProperty("--i", String(i));
-  drawViewer();
+
+function drawProbe() {
+  const probe = state.probe;
+  const pixels = state.pixels;
+  cells.forEach((cell) => {
+    cell.cross.style.opacity = probe && pixels ? "1" : "0";
+    if (probe) cell.cross.style.setProperty("--x", `${((probe.x + 0.5) / SIZE) * 100}%`), cell.cross.style.setProperty("--y", `${((probe.y + 0.5) / SIZE) * 100}%`);
+  });
+  quad.classList.toggle("pinned", state.pinned);
+  ($("probe-reset") as HTMLButtonElement).disabled = !pixels || probe === state.auto;
+  if (!probe || !pixels) {
+    cells.forEach((cell) => (cell.read.textContent = ""));
+    uptake.set(null, null);
+    $("probe-read").textContent = pixels ? "" : "Carga un corte para medir la captación de contraste.";
+    return;
+  }
+  const values = pixels.map((p) => windowMean(p, SIZE, probe.x, probe.y));
+  cells.forEach((cell, i) => (cell.read.textContent = i < 3 ? comma2(values[i]) : `${values[1] - values[0] >= 0 ? "+" : "−"}${comma2(Math.abs(values[1] - values[0]))}`));
+  uptake.set(values, pixels.map(cropMean));
+  const { pattern, delayed } = kinetics(values[0], values[1], values[2]);
+  const where = state.pinned
+    ? `Punto fijado en (${probe.x}, ${probe.y}). Haz clic de nuevo para soltarlo.`
+    : probe === state.auto
+      ? `Punto de mayor realce del recorte central, en (${probe.x}, ${probe.y}). Pasa el cursor por la imagen para medir otro.`
+      : `Punto (${probe.x}, ${probe.y}). Haz clic para fijarlo.`;
+  const change = `${delayed >= 0 ? "sube" : "baja"} un ${percent(Math.abs(delayed))} % respecto a EARLY`;
+  const verdict =
+    pattern === "sin realce"
+      ? `Sin realce apreciable: EARLY supera a PRE en menos de ${comma2(MIN_ENHANCEMENT)}.`
+      : `${pattern[0].toUpperCase()}${pattern.slice(1)}: en LATE la intensidad ${change}.`;
+  $("probe-read").replaceChildren(
+    make("span", "probe-values", `PRE ${comma2(values[0])}  →  EARLY ${comma2(values[1])}  →  LATE ${comma2(values[2])}`),
+    make("b", "", verdict),
+    make("span", "muted", where),
+  );
 }
-segButtons.forEach((b, i) => b.addEventListener("click", () => setView(i)));
-seg.addEventListener("keydown", (e) => {
-  const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-  if (!step) return;
-  const next = (state.view + step + VIEWS.length) % VIEWS.length;
-  setView(next);
-  segButtons[next].focus();
+
+function pointAt(event: PointerEvent) {
+  const box = (event.target as HTMLElement).closest(".cell")!.getBoundingClientRect();
+  const clamp = (v: number) => Math.max(0, Math.min(SIZE - 1, Math.floor(v * SIZE)));
+  return { x: clamp((event.clientX - box.left) / box.width), y: clamp((event.clientY - box.top) / box.height) };
+}
+quad.addEventListener("pointermove", (event) => {
+  if (state.pinned || !state.pixels || !(event.target as HTMLElement).closest(".cell")) return;
+  state.probe = pointAt(event);
+  drawProbe();
+});
+$("probe-reset").addEventListener("click", () => {
+  state.probe = state.auto;
+  state.pinned = false;
+  drawProbe();
+});
+quad.addEventListener("click", (event) => {
+  if (!state.pixels || !(event.target as HTMLElement).closest(".cell")) return;
+  state.pinned = !state.pinned;
+  state.probe = pointAt(event as PointerEvent);
+  drawProbe();
+});
+quad.addEventListener("keydown", (event) => {
+  const moves: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const move = moves[event.key];
+  if (!move || !state.probe) return;
+  event.preventDefault();
+  const step = event.shiftKey ? 8 : 1;
+  const clamp = (v: number) => Math.max(0, Math.min(SIZE - 1, v));
+  state.probe = { x: clamp(state.probe.x + move[0] * step), y: clamp(state.probe.y + move[1] * step) };
+  state.pinned = true;
+  drawProbe();
 });
 ($("crop-toggle") as HTMLInputElement).addEventListener("change", (e) => {
-  $("main-view").classList.toggle("no-crop", !(e.target as HTMLInputElement).checked);
+  quad.classList.toggle("no-crop", !(e.target as HTMLInputElement).checked);
 });
 
 /* ---------- Result and log ---------- */
@@ -198,11 +255,16 @@ function showResult(prediction: Prediction | null, animate = true) {
   network.setOutputs(prediction?.foldCalibrated ?? null, prediction?.calibrated ?? null);
   const pill = $("pill"), prob = $("prob");
   if (!prediction) {
+    const ready = state.model != null;
     prob.className = "prob idle";
-    prob.textContent = state.pixels ? "Pulsa Predecir" : "Carga un corte";
+    prob.textContent = !ready ? (state.modelError ? "Modelo no disponible" : "Cargando el modelo") : state.pixels ? "Pulsa Predecir" : "Carga un corte";
     pill.className = "pill idle";
     pill.textContent = state.pixels ? "Lista" : "Sin muestra";
-    $("reading").textContent = "";
+    $("reading").textContent = ready
+      ? ""
+      : state.modelError
+        ? `No se pudo cargar el modelo: ${state.modelError} Recarga la página para intentarlo de nuevo.`
+        : `Descargando y verificando el modelo (${comma(manifest.model.bytes / 1e6, 1)} MB). Predecir se activa cuando termine.`;
     $("f-spread").textContent = "—";
     $("f-time").textContent = "—";
     $("revealed").textContent = "";
@@ -229,7 +291,7 @@ function showResult(prediction: Prediction | null, animate = true) {
 function renderLog() {
   const rows = $("rows");
   rows.replaceChildren();
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < Math.max(5, state.log.length); i++) {
     const e = state.log[i];
     const tr = make("tr", e ? "" : "empty");
     const cell = (content = "", cls = "") => { const td = make("td", cls, content); tr.append(td); return td; };
@@ -255,7 +317,7 @@ function renderLog() {
   const revealed = state.log.filter((e) => e.label != null);
   const hits = revealed.filter((e) => (e.label === 1) === e.positive).length;
   $("log-summary").textContent =
-    `${Math.min(5, state.log.length)} de 5 · ` + (revealed.length ? `${hits} ${hits === 1 ? "acierto" : "aciertos"} de ${revealed.length} ${revealed.length === 1 ? "revelada" : "reveladas"}` : "sin etiquetas reveladas");
+    `${state.log.length} de 5, ` + (revealed.length ? `${hits} ${hits === 1 ? "acierto" : "aciertos"} de ${revealed.length} ${revealed.length === 1 ? "revelada" : "reveladas"}` : "sin etiquetas reveladas");
 }
 
 function updateButtons() {
@@ -284,7 +346,9 @@ function setSlice(pixels: Uint8ClampedArray[] | null, sampleId: string | null, e
   state.pixels = pixels; state.sampleId = sampleId; state.example = example;
   state.views = pixels ? [...pixels.map((p) => canvasOf(imageData(p))), canvasOf(enhancement(pixels[0], pixels[1]))] : [];
   network.setInput(pixels ? state.views.slice(0, 3).map((c) => c.toDataURL()) : null);
-  $("viewer-sample").textContent = sampleId ?? "—";
+  state.auto = pixels ? strongestEnhancement(pixels[0], pixels[1]) : null;
+  state.probe = state.auto;
+  state.pinned = false;
   ($("reveal") as HTMLButtonElement).disabled = true;
   for (const card of document.querySelectorAll<HTMLElement>(".sample")) card.setAttribute("aria-current", String(card.dataset.id === sampleId && example != null));
   $("drop").classList.toggle("current", pixels != null && example == null);
@@ -318,12 +382,17 @@ for (const example of manifest.examples) {
   const button = make("button", "sample");
   button.dataset.id = example.sample_id;
   button.setAttribute("role", "listitem");
-  const image = make("img");
-  image.src = `${BASE}${example.files.EARLY}`;
-  image.alt = `Fase EARLY de ${example.sample_id}`;
+  const strip = make("span", "strip");
+  for (const phase of PHASES) {
+    const image = make("img");
+    image.src = `${BASE}${example.files[phase]}`;
+    image.alt = "";
+    strip.append(image);
+  }
   const meta = make("span", "meta");
-  meta.append(make("span", "label", `${COHORTS[example.cohort]} · test`), make("span", "sid", example.sample_id));
-  button.append(image, meta);
+  meta.append(make("span", "cohort", COHORTS[example.cohort]), make("span", "sid", example.sample_id));
+  button.setAttribute("aria-label", `Corte ${example.sample_id}, cohorte ${COHORTS[example.cohort]}, test`);
+  button.append(strip, meta);
   button.addEventListener("click", async () => {
     $("errors").replaceChildren();
     setSlice(await loadExample(example), example.sample_id, example);
@@ -337,15 +406,19 @@ $("predict").addEventListener("click", async () => {
   const prediction = await state.model.predict(toTensor(state.pixels));
   showResult(prediction);
   const positive = prediction.calibrated >= THRESHOLD;
-  state.log.push({ time: new Date(), sampleId: state.sampleId!, probability: prediction.calibrated, threshold: THRESHOLD, positive, label: null });
+  // One row per slice: predicting the same slice again replaces its row and keeps a revealed label
+  const entry: Entry = { time: new Date(), sampleId: state.sampleId!, probability: prediction.calibrated, threshold: THRESHOLD, positive, label: null };
+  const index = state.log.findIndex((e) => e.sampleId === entry.sampleId);
+  if (index >= 0) state.log[index] = { ...entry, label: state.log[index].label };
+  else state.log.push(entry);
   renderLog();
   ($("reveal") as HTMLButtonElement).disabled = state.example == null;
 });
 $("reveal").addEventListener("click", () => {
-  const entry = state.log[state.log.length - 1];
+  const entry = state.log.find((e) => e.sampleId === state.sampleId);
   if (!state.example || !entry) return;
   entry.label = state.example.label;
-  $("revealed").textContent = `real ${entry.label ? "pCR" : "sin pCR"} · ${(entry.label === 1) === entry.positive ? "acierto" : "fallo"}`;
+  $("revealed").textContent = `Real: ${entry.label ? "pCR" : "sin pCR"}, ${(entry.label === 1) === entry.positive ? "acierto" : "fallo"}`;
   ($("reveal") as HTMLButtonElement).disabled = true;
   renderLog();
 });
@@ -369,18 +442,39 @@ addEventListener("dragleave", () => { drags = Math.max(0, drags - 1); if (!drags
 addEventListener("dragover", (e) => e.preventDefault());
 addEventListener("drop", (e) => { e.preventDefault(); drags = 0; catcher.classList.remove("on"); handleFiles([...(e.dataTransfer?.files ?? [])]); });
 
-// The navigation marks the section in view.
+// Specular highlight of the glass buttons follows the pointer.
+addEventListener("pointermove", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLElement>(".btn");
+  if (!button) return;
+  const box = button.getBoundingClientRect();
+  button.style.setProperty("--mx", `${event.clientX - box.left}px`);
+  button.style.setProperty("--my", `${event.clientY - box.top}px`);
+});
+
+// The navigation marks the section in view; its glass thumb slides under that link and hides
+// over the opening.
 const links = [...document.querySelectorAll<HTMLAnchorElement>(".nav a")];
+const thumb = document.querySelector<HTMLElement>(".nav-thumb")!;
+function placeThumb() {
+  const on = links.find((link) => link.classList.contains("on"));
+  thumb.classList.toggle("on", on != null);
+  if (!on) return;
+  thumb.style.setProperty("--x", `${on.offsetLeft}px`);
+  thumb.style.setProperty("--w", `${on.offsetWidth}px`);
+}
 const observer = new IntersectionObserver((entries) => {
   for (const entry of entries) {
     if (!entry.isIntersecting) continue;
-    for (const link of links) link.classList.toggle("on", link.hash === `#${entry.target.id}`);
+    const id = entry.target.id === "top" ? null : `#${entry.target.id}`;
+    for (const link of links) link.classList.toggle("on", link.hash === id);
   }
+  placeThumb();
 }, { rootMargin: "-45% 0px -50% 0px" });
 for (const link of links) observer.observe(document.querySelector(link.hash)!);
+observer.observe($("top"));
+document.fonts.ready.then(placeThumb);
 
 /* ---------- Start: first example on screen, model loaded and checked against Python ---------- */
-renderStats();
 renderSteps();
 renderSpec();
 renderLimits();
@@ -389,6 +483,17 @@ drawViewer();
 (async () => {
   const first = manifest.examples[0];
   setSlice(await loadExample(first), first.sample_id, first);
+  startHero($("hero-canvas") as HTMLCanvasElement, {
+    phases: state.views.slice(0, 3),
+    enhancement: state.views[3],
+    sampleId: first.sample_id,
+    cohort: COHORTS[first.cohort],
+    crop: CROP,
+    stages: arch.stages,
+    params: arch.params,
+    models: arch.models,
+    probability: first.expected.calibrated[0],
+  });
   const chip = $("model-chip"), stateLabel = $("model-state");
   try {
     const model = await loadModel(`${BASE}${manifest.model.file}`, manifest.model.sha256);
@@ -407,7 +512,9 @@ drawViewer();
   } catch (error) {
     chip.className = "chip error";
     stateLabel.textContent = "no disponible";
-    chip.title = error instanceof Error ? error.message : String(error);
+    state.modelError = error instanceof Error ? error.message : String(error);
+    chip.title = state.modelError;
   }
+  if ($("prob").classList.contains("idle")) showResult(null, false);
   updateButtons();
 })();
