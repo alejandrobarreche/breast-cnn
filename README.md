@@ -6,6 +6,8 @@ Este repositorio contiene el desarrollo de un proyecto académico de Deep Learni
 
 La red genera una probabilidad de pCR para cada corte. Posteriormente, las predicciones de los cortes pertenecientes a una misma paciente se agregan para obtener una predicción a nivel de paciente.
 
+**Aplicación web:** <https://alejandrobarreche.github.io/breast-cnn/>. El modelo se ejecuta en el navegador; uso educativo, sin validez clínica.
+
 ---
 
 ## Objetivo
@@ -212,7 +214,7 @@ cd web && npm install && npm test   # incluye la paridad con las salidas de Pyth
 npm run dev                         # http://localhost:5173
 ```
 
-Se publica en GitHub Pages con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v1` y comprueba su SHA-256 contra `web/src/manifest.json`.
+Se publica en <https://alejandrobarreche.github.io/breast-cnn/> con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v1` y comprueba su SHA-256 contra `web/src/manifest.json`.
 
 ---
 
