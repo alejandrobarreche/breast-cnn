@@ -72,7 +72,7 @@ def create_data_loaders(
     samples: pd.DataFrame,
     project_root: Path | str,
     *,
-    validation_fold: int,
+    validation_fold: int | tuple[int, ...],
     batch_size: int,
     seed: int,
     num_workers: int = 0,

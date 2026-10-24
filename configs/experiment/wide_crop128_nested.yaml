@@ -1,0 +1,15 @@
+# @package _global_
+# wide_crop128_fixed with one model per pair of folds (10 models, each trained on three
+# folds). Each fold gets the mean of the four models that never saw it: an out-of-fold
+# version of the final five-model ensemble, on which the threshold is chosen.
+train:
+  experiment: wide_crop128_nested
+  weighted_loss: true
+  model: configs/model/wide_crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
+  epochs: 3
+  epoch_selection: last
+  nested: true

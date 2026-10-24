@@ -11,7 +11,12 @@ from PIL import Image
 from torch import nn
 
 from breast_cnn.configuration import DataConfig, TrainConfig, load_train_config
-from breast_cnn.evaluation import load_fold_models, predict_ensemble
+from breast_cnn.evaluation import (
+    load_fold_models,
+    load_runs,
+    nested_ensemble_scores,
+    predict_ensemble,
+)
 from breast_cnn.training import (
     aggregate_patients,
     binary_metrics,
@@ -214,6 +219,29 @@ def test_run_experiment_writes_complete_run(training_project: Path) -> None:
 
     with pytest.raises(FileExistsError):
         run_dir.mkdir()
+
+
+def test_nested_run_trains_one_model_per_fold_pair(training_project: Path) -> None:
+    data, config = smoke_config(folds=[0, 3, 4], epochs=1, epoch_selection="last", nested=True)
+    run_dir = run_experiment(training_project, data, config)
+    metrics = json.loads((run_dir / "metrics.json").read_text())
+    assert metrics["scope"] == "nested_fold_pairs"
+    assert [fold["fold"] for fold in metrics["folds"]] == ["0-3", "0-4", "3-4"]
+    # Each model trains on the two remaining folds and validates on both of its own.
+    assert {fold["training_patients"] for fold in metrics["folds"]} == {6}
+    assert {fold["patient"]["n"] for fold in metrics["folds"]} == {4}
+    for name in ("0-3", "0-4", "3-4"):
+        assert (run_dir / f"model_fold{name}.pt").is_file()
+
+    predictions = pd.read_csv(run_dir / "predictions_validation.csv")
+    samples = pd.read_csv(training_project / "metadata/samples.csv").set_index("sample_id")
+    assert predictions["fold"].tolist() == samples.loc[predictions["sample_id"], "fold"].tolist()
+    for fold, rows in predictions.groupby("fold"):
+        assert all(str(fold) in model.split("-") for model in rows["model"])
+    # Every slice is scored by the two models that never saw its fold.
+    assert set(predictions.groupby("sample_id")["model"].nunique()) == {2}
+    assert len(nested_ensemble_scores(predictions)) == 6
+    assert load_runs(training_project / "runs") == []
 
 
 @pytest.mark.parametrize("loss_unit", ["slice", "patient"])

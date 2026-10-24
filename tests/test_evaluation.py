@@ -16,6 +16,7 @@ from breast_cnn.evaluation import (
     evaluate_test,
     fit_platt,
     fold_auc,
+    nested_ensemble_scores,
     paired_differences,
     patient_test_scores,
     specificity_threshold,
@@ -106,39 +107,67 @@ def test_specificity_threshold_is_the_lowest_meeting_the_constraint() -> None:
     assert predicted[labels == 1].sum() == 2
 
 
-def test_calibration_report_uses_each_fold_and_one_threshold() -> None:
-    rng = np.random.default_rng(1)
+def _nested_predictions(rng: np.random.Generator) -> pd.DataFrame:
+    """Three folds of 100 patients (two slices each), each scored by the two models whose
+    pair excludes its fold, as a nested run over folds [0, 1, 2] writes them."""
     rows = []
-    for fold, shift in ((0, 0.0), (1, 0.3)):
-        for patient in range(200):
-            label = int(patient < 60)
-            base = shift + 0.1 * label + rng.normal(0, 0.1)
-            for _ in range(2):
-                rows.append(
-                    {
-                        "fold": fold,
-                        "patient_id": f"{fold}_{patient}",
-                        "label": label,
-                        "probability": float(np.clip(0.3 + base, 0.01, 0.99)),
-                    }
-                )
-    report = calibrate_and_threshold(pd.DataFrame(rows), 0.9)
-    assert set(report["folds"]) == {0, 1}
-    # Calibration removes the shift between folds: each mean matches its pCR rate.
-    for fold in report["folds"].values():
-        assert fold["mean_calibrated_probability"] == pytest.approx(fold["pcr_rate"], abs=1e-3)
+    for fold in range(3):
+        models = [f"{min(fold, other)}-{max(fold, other)}" for other in range(3) if other != fold]
+        for patient in range(100):
+            label = int(patient < 30)
+            for z in range(2):
+                for model in models:
+                    rows.append(
+                        {
+                            "fold": fold,
+                            "model": model,
+                            "sample_id": f"{fold}_{patient}_z{z}",
+                            "patient_id": f"{fold}_{patient}",
+                            "label": label,
+                            "probability": float(
+                                np.clip(0.4 + 0.1 * label + rng.normal(0, 0.1), 0.01, 0.99)
+                            ),
+                        }
+                    )
+    return pd.DataFrame(rows)
+
+
+def test_nested_scores_average_the_out_of_fold_models() -> None:
+    predictions = _nested_predictions(np.random.default_rng(1))
+    slices = nested_ensemble_scores(predictions, "slice")
+    assert len(slices) == 600
+    expected = predictions.groupby("sample_id")["probability"].mean()
+    assert slices.set_index("sample_id")["probability"].loc[expected.index].tolist() == (
+        pytest.approx(expected.tolist())
+    )
+    patients = nested_ensemble_scores(predictions)
+    assert len(patients) == 300 and set(patients["fold"]) == {0, 1, 2}
+    with pytest.raises(ValueError):
+        nested_ensemble_scores(predictions.iloc[1:])  # one slice loses a model
+    with pytest.raises(ValueError):
+        nested_ensemble_scores(predictions, "cohort")
+
+
+def test_calibration_report_fits_one_map_and_threshold_on_the_ensemble_mean() -> None:
+    predictions = _nested_predictions(np.random.default_rng(1))
+    report = calibrate_and_threshold(predictions, 0.9)
+    assert report["models_per_unit"] == 2 and set(report["folds"]) == {0, 1, 2}
+    patients = nested_ensemble_scores(predictions)
+    calibrated = apply_platt(patients["probability"], report["platt"])
+    # Platt keeps the ranking and, fitted by maximum likelihood, matches the pCR rate.
+    assert calibrated.mean() == pytest.approx(patients["label"].mean(), abs=1e-3)
     assert report["pooled_validation"]["specificity"] >= 0.9
+    negatives = calibrated[patients["label"].eq(0)]
+    assert (negatives < report["threshold"]).mean() == pytest.approx(
+        report["pooled_validation"]["specificity"]
+    )
+    slices = calibrate_and_threshold(predictions, 0.9, unit="slice")
+    assert slices["unit"] == "slice" and slices["pooled_validation"]["n"] == 600
 
 
 def test_test_evaluation_on_synthetic_patients() -> None:
     rng = np.random.default_rng(2)
-    calibration = {
-        "threshold": 0.3,
-        "folds": {
-            "0": {"slope": 1.0, "intercept": 0.0},
-            "1": {"slope": 0.0, "intercept": -1.0},  # constant model
-        },
-    }
+    calibration = {"threshold": 0.3, "platt": {"slope": 0.5, "intercept": -0.4}}
     rows = []
     for patient in range(80):
         label = int(patient < 30)
@@ -157,8 +186,7 @@ def test_test_evaluation_on_synthetic_patients() -> None:
     patients = patient_test_scores(slices, calibration)
     expected_raw = slices.groupby("patient_id")[["probability_fold0", "probability_fold1"]].mean()
     assert patients["raw"].tolist() == pytest.approx(expected_raw.mean(axis=1).tolist())
-    calibrated_one = 1 / (1 + np.exp(1.0))
-    expected = (expected_raw["probability_fold0"] + calibrated_one) / 2
+    expected = apply_platt(expected_raw.mean(axis=1), calibration["platt"])
     assert patients["calibrated"].tolist() == pytest.approx(expected.tolist())
 
     cohorts = pd.Series(np.where(np.arange(80) % 2, "a", "b"), index=patients.index)
@@ -175,20 +203,6 @@ def test_test_evaluation_on_synthetic_patients() -> None:
     counts = report["at_threshold"]
     assert counts["true_positives"] + counts["false_negatives"] == 30
     assert set(report["by_cohort"]) == {"a", "b"}
-
-
-def test_slice_calibration_scores_every_slice() -> None:
-    rows = [
-        {"fold": fold, "patient_id": f"{fold}_{p}", "label": int(p < 3), "probability": prob}
-        for fold in (0, 1)
-        for p in range(10)
-        for prob in (0.2 + 0.05 * p, 0.25 + 0.05 * p)
-    ]
-    report = calibrate_and_threshold(pd.DataFrame(rows), 0.9, unit="slice")
-    assert report["unit"] == "slice" and report["aggregation"] is None
-    assert report["pooled_validation"]["n"] == 40
-    with pytest.raises(ValueError):
-        calibrate_and_threshold(pd.DataFrame(rows), 0.9, unit="cohort")
 
 
 def _tiny_models() -> dict[int, torch.nn.Module]:
@@ -208,27 +222,25 @@ def _tiny_models() -> dict[int, torch.nn.Module]:
 
 
 def test_calibrated_ensemble_matches_the_numpy_calibration() -> None:
-    maps = {0: {"slope": 0.4, "intercept": -0.9}, 1: {"slope": 0.0, "intercept": -1.0}}
+    platt = {"slope": 0.4, "intercept": -0.9}
     models = _tiny_models()
-    ensemble = CalibratedEnsemble(models, maps).eval()
+    ensemble = CalibratedEnsemble(models, platt).eval()
     images = torch.rand(3, 3, 256, 256)
     with torch.no_grad():
         folds, raw, calibrated, fold_calibrated = ensemble(images)
         expected = torch.stack([torch.sigmoid(models[f](images)) for f in (0, 1)], dim=1)
     assert folds.numpy() == pytest.approx(expected.numpy(), abs=1e-7)
     assert raw.numpy() == pytest.approx(expected.mean(dim=1).numpy(), abs=1e-7)
-    numpy_calibrated = np.mean(
-        [apply_platt(expected[:, f].numpy(), maps[f]) for f in (0, 1)], axis=0
-    )
+    numpy_calibrated = apply_platt(expected.mean(dim=1).numpy(), platt)
     assert calibrated.numpy() == pytest.approx(numpy_calibrated, abs=1e-6)
-    assert fold_calibrated.mean(dim=1).numpy() == pytest.approx(calibrated.numpy(), abs=1e-7)
+    numpy_folds = apply_platt(expected.numpy(), platt)
+    assert fold_calibrated.numpy() == pytest.approx(numpy_folds, abs=1e-6)
 
 
 def test_calibrated_ensemble_exports_to_onnx_with_parity(tmp_path) -> None:
     onnxruntime = pytest.importorskip("onnxruntime")
     pytest.importorskip("onnxscript")
-    maps = {0: {"slope": 0.4, "intercept": -0.9}, 1: {"slope": 0.2, "intercept": -0.5}}
-    ensemble = CalibratedEnsemble(_tiny_models(), maps).eval()
+    ensemble = CalibratedEnsemble(_tiny_models(), {"slope": 0.4, "intercept": -0.9}).eval()
     path = tmp_path / "ensemble.onnx"
     image = torch.rand(1, 3, 256, 256)
     with torch.no_grad():

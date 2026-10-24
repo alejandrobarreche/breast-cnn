@@ -12,7 +12,7 @@ test must reproduce. Also writes web/src/runs.json for the experiment lab: per r
 changed with respect to the reference experiment, the validation patient AUC of each fold
 (epoch chosen without the evaluated fold, or the last epoch for fixed-epoch runs, and the
 optimistic best epoch), the mean learning curves, and the cohort-only baseline. And writes
-web/src/results.json for the results charts: the final run's out-of-fold validation patients
+web/src/results.json for the results charts: the nested run's out-of-fold validation patients
 and the test patients (label, raw and calibrated mean probability), the patient threshold, and
 the per-fold history of the run whose curves fixed the number of epochs of the final model.
 """
@@ -36,7 +36,7 @@ from breast_cnn.data.metadata import (
     load_samples,
     resolve_image_path,
 )
-from breast_cnn.evaluation.calibration import fit_fold_calibration
+from breast_cnn.evaluation.calibration import apply_platt, nested_ensemble_scores
 from breast_cnn.evaluation.final import patient_test_scores
 from breast_cnn.evaluation.runs import (
     cohort_baseline,
@@ -163,7 +163,9 @@ def _lab(root: Path, runs_dir: str, final_run: str, patients: pd.DataFrame) -> d
 def _results(root: Path, analysis, calibration: dict) -> dict:
     """Patient scores of internal validation and test, and the curves that fixed the epochs."""
     run_dir = root / analysis.final_run
-    _, validation = fit_fold_calibration(pd.read_csv(run_dir / "predictions_validation.csv"))
+    nested = pd.read_csv(root / calibration["nested_run"] / "predictions_validation.csv")
+    validation = nested_ensemble_scores(nested)
+    validation["calibrated"] = apply_platt(validation["probability"], calibration["platt"])
     test = patient_test_scores(pd.read_csv(root / analysis.test_predictions_path), calibration)
     reference = next(
         r for r in load_runs(root / analysis.runs_dir) if r.experiment == EPOCH_REFERENCE
@@ -270,7 +272,7 @@ def main() -> None:
             "stages": _stages(model_config),
             "params": sum(p.numel() for p in build_model(model_config).parameters()),
             "dropout": model_config.dropout,
-            "models": len(slice_calibration["folds"]),
+            "models": len(train["folds"]),
         },
         "training": {
             "experiment": train["experiment"],

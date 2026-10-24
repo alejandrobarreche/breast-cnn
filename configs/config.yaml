@@ -62,6 +62,9 @@ train:
   train_slices_per_patient: null
   threshold: 0.5
   runs_dir: runs
+  # true: one model per pair of folds, trained on the other three and validated on both;
+  # gives out-of-fold ensemble scores for the threshold of the final ensemble.
+  nested: false
 
 # Analysis of finished runs (notebooks/02_runs_analysis.ipynb); internal validation only.
 analysis:
@@ -74,6 +77,9 @@ analysis:
   seed: 2026
   # Final image-only model: its fold models are averaged on test after calibration.
   final_run: runs/20261018-1330_wide_crop128_fixed
+  # Same protocol with nested: true. The calibration map and the threshold are fitted on its
+  # out-of-fold ensemble scores, the same kind of score the final ensemble gives on test.
+  nested_run: null
   min_specificity: 0.9
   calibration_report_path: artifacts/metrics/calibration_validation_patient.json
   # Same protocol per slice, for the web application (one slice per prediction).
@@ -85,3 +91,6 @@ analysis:
   # Single test evaluation (scripts/evaluate_test.py); existing outputs are never overwritten.
   test_report_path: artifacts/metrics/test_evaluation_patient.json
   test_predictions_path: artifacts/metrics/predictions_test_slice.csv
+  # Threshold correction made after the test evaluation (scripts/evaluate_test.py --correction):
+  # same test predictions, calibration and threshold from the nested run.
+  corrected_test_report_path: artifacts/metrics/test_evaluation_patient_corrected.json

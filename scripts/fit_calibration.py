@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Fit per-fold Platt calibration and the threshold on internal validation only.
+"""Fit the Platt map and the threshold of the final ensemble on internal validation only.
 
   python scripts/fit_calibration.py                # per patient (test evaluation)
   python scripts/fit_calibration.py --unit slice   # per slice (web application)
 
-Writes analysis.calibration_report_path or analysis.slice_calibration_report_path.
+Reads the out-of-fold ensemble scores of analysis.nested_run, which must repeat the training
+protocol of analysis.final_run. Writes analysis.calibration_report_path or
+analysis.slice_calibration_report_path.
 """
 
 import argparse
@@ -12,6 +14,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from omegaconf import OmegaConf
 
 from breast_cnn.configuration import load_analysis_config
 from breast_cnn.evaluation import calibrate_and_threshold
@@ -26,10 +29,23 @@ def main() -> None:
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     _, analysis = load_analysis_config(root, args.overrides)
-    run_dir = root / analysis.final_run
-    predictions = pd.read_csv(run_dir / "predictions_validation.csv")
+    if analysis.nested_run is None:
+        parser.error("set analysis.nested_run to the finished nested run")
+    final, nested = (
+        OmegaConf.to_container(OmegaConf.load(root / run / "config.yaml"))
+        for run in (analysis.final_run, analysis.nested_run)
+    )
+    differences = {
+        key
+        for key in final["train"].keys() | nested["train"].keys()
+        if final["train"].get(key) != nested["train"].get(key)
+    } - {"experiment", "nested", "num_workers"}
+    if final["model"] != nested["model"] or differences or not nested["train"]["nested"]:
+        raise ValueError(f"The nested run does not repeat the final protocol: {differences}")
+    predictions = pd.read_csv(root / analysis.nested_run / "predictions_validation.csv")
     report = {
         "run": analysis.final_run,
+        "nested_run": analysis.nested_run,
         **calibrate_and_threshold(predictions, analysis.min_specificity, args.unit),
     }
     path = root / (

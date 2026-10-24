@@ -64,27 +64,28 @@ def predict_ensemble(
 
 
 class CalibratedEnsemble(nn.Module):
-    """The fold models and their Platt maps as one network, for export to the web application.
+    """The fold models and the Platt map as one network, for export to the web application.
 
     Input: float32 [B, 3, 256, 256] in [0, 1], channels PRE, EARLY, LATE (value / 255).
-    Outputs: probability of each fold model [B, K], their mean [B], the mean of the
-    calibrated probabilities [B] (the score compared with the threshold) and the calibrated
-    probability of each fold model [B, K].
+    Outputs: probability of each fold model [B, K], their mean [B], the calibrated mean [B]
+    (the score compared with the threshold) and each fold probability through the same map
+    [B, K], to show where each model falls on the calibrated scale.
     """
 
-    def __init__(self, models: dict[int, nn.Module], maps: dict[int, dict]) -> None:
+    def __init__(self, models: dict[int, nn.Module], platt: dict) -> None:
         super().__init__()
-        folds = sorted(models)
-        self.models = nn.ModuleList(models[fold] for fold in folds)
-        self.register_buffer("slopes", torch.tensor([maps[f]["slope"] for f in folds]))
-        self.register_buffer("intercepts", torch.tensor([maps[f]["intercept"] for f in folds]))
+        self.models = nn.ModuleList(models[fold] for fold in sorted(models))
+        self.slope = float(platt["slope"])
+        self.intercept = float(platt["intercept"])
+
+    def _calibrate(self, probabilities: torch.Tensor) -> torch.Tensor:
+        # Same clipping as calibration.apply_platt, so both give the same calibrated value.
+        clipped = probabilities.clamp(1e-6, 1 - 1e-6)
+        return torch.sigmoid(self.slope * torch.log(clipped / (1 - clipped)) + self.intercept)
 
     def forward(
         self, images: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         probabilities = torch.sigmoid(torch.stack([m(images) for m in self.models], dim=1))
-        # Same clipping as calibration.apply_platt, so both give the same calibrated value.
-        clipped = probabilities.clamp(1e-6, 1 - 1e-6)
-        logits = torch.log(clipped / (1 - clipped))
-        calibrated = torch.sigmoid(self.slopes * logits + self.intercepts)
-        return probabilities, probabilities.mean(dim=1), calibrated.mean(dim=1), calibrated
+        mean = probabilities.mean(dim=1)
+        return probabilities, mean, self._calibrate(mean), self._calibrate(probabilities)

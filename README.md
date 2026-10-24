@@ -198,6 +198,15 @@ Cada época imprime la pérdida y el AUC por paciente de train y validación. Si
 python scripts/train.py --resume runs/<id>
 ```
 
+Calibración y umbral del ensemble final. El run anidado entrena un modelo por cada par de folds con el protocolo final. Cada paciente recibe la media de los cuatro modelos que no vieron su fold, que es el mismo tipo de puntuación que da el ensemble en test. Sobre esa puntuación se ajustan el mapa de Platt y el umbral (`analysis.nested_run` en `configs/config.yaml`):
+
+```bash
+python scripts/train.py +experiment=wide_crop128_nested
+python scripts/fit_calibration.py                 # por paciente (evaluación en test)
+python scripts/fit_calibration.py --unit slice    # por corte (aplicación web)
+python scripts/evaluate_test.py --correction      # reevalúa test con el umbral corregido
+```
+
 Tests y estilo:
 
 ```bash

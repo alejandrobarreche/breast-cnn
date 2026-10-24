@@ -1,7 +1,8 @@
 """Single evaluation of the final ensemble on test, with every decision fixed beforehand.
 
-The fold models, the calibration maps and the threshold come from internal validation
-(`calibration_validation_patient.json`); test labels are used only to compute metrics.
+The fold models come from the final run; the calibration map and the threshold come from
+the out-of-fold ensemble scores of the nested run (`calibration_validation_patient.json`).
+Test labels are used only to compute metrics.
 """
 
 from __future__ import annotations
@@ -16,27 +17,19 @@ from breast_cnn.training.metrics import binary_metrics
 
 
 def patient_test_scores(slices: pd.DataFrame, calibration: dict) -> pd.DataFrame:
-    """One row per patient: mean raw and mean calibrated probability of the fold models.
+    """One row per patient: mean probability of the fold models (`raw`) and its calibration.
 
-    Each fold model is first aggregated per patient (mean over slices) and calibrated with
-    its own map; the mean raw probability equals the patient mean of the slice ensemble.
+    `raw` is the patient mean of the slice ensemble, the score on which the nested run fitted
+    the Platt map and the threshold.
     """
-    folds = sorted(int(fold) for fold in calibration["folds"])
-    columns = [f"probability_fold{fold}" for fold in folds]
+    columns = sorted(c for c in slices.columns if c.startswith("probability_fold"))
     grouped = slices.groupby("patient_id", sort=True)
     if (grouped["label"].nunique() > 1).any():
         raise ValueError("A patient has slices with different labels")
     patients = grouped[columns].mean()
     patients.insert(0, "label", grouped["label"].first())
-    calibrated = pd.DataFrame(
-        {
-            fold: apply_platt(patients[f"probability_fold{fold}"], calibration["folds"][str(fold)])
-            for fold in folds
-        },
-        index=patients.index,
-    )
     patients["raw"] = patients[columns].mean(axis=1)
-    patients["calibrated"] = calibrated.mean(axis=1)
+    patients["calibrated"] = apply_platt(patients["raw"], calibration["platt"])
     return patients
 
 

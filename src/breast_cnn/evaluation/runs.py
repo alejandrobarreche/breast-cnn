@@ -23,12 +23,17 @@ class Run:
 
 
 def load_runs(runs_dir: Path) -> list[Run]:
-    """Load every finished run (one with metrics.json), ordered by directory name."""
+    """Load every finished experiment run (one with metrics.json), ordered by directory name.
+
+    Nested runs are skipped: they serve the threshold of the final model, not the comparison.
+    """
     runs = []
     for directory in sorted(path for path in Path(runs_dir).iterdir() if path.is_dir()):
         if not (directory / "metrics.json").is_file():
             continue
         metrics = json.loads((directory / "metrics.json").read_text(encoding="utf-8"))
+        if metrics["scope"] != "internal_validation_folds":
+            continue
         runs.append(
             Run(
                 experiment=metrics["experiment"],

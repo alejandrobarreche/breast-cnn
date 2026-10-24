@@ -175,8 +175,13 @@ def fit_fold(
     fold: int,
     device: torch.device,
     run_dir: Path,
+    paired_fold: int | None = None,
 ) -> FoldResult:
     """Train on four folds, validate on `fold` and keep one epoch (reported as best_epoch).
+
+    With `paired_fold` (nested runs) the model trains on the other three folds and validates
+    on both; it is named `<fold>-<paired_fold>` and its predictions keep each slice's own fold
+    in `fold` and the model name in `model`.
 
     With `epoch_selection: best` the kept epoch has the best patient AUC and early stopping
     ends training after `early_stopping_patience` epochs without improvement; selecting the
@@ -187,10 +192,12 @@ def fit_fold(
     exists, training continues from it. With `num_workers=0` the continuation is
     identical to an uninterrupted run; with workers, augmentation draws differ.
     """
+    validation_folds = fold if paired_fold is None else (fold, paired_fold)
+    name = str(fold) if paired_fold is None else f"{fold}-{paired_fold}"
     train_loader, validation_loader = create_data_loaders(
         samples,
         root,
-        validation_fold=fold,
+        validation_fold=validation_folds,
         batch_size=config.batch_size,
         seed=config.seed,
         num_workers=config.num_workers,
@@ -229,7 +236,7 @@ def fit_fold(
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
 
-    checkpoint_path = run_dir / f"checkpoint_fold{fold}.pt"
+    checkpoint_path = run_dir / f"checkpoint_fold{name}.pt"
     state = {
         "epoch": 0,
         "finished": False,
@@ -247,7 +254,7 @@ def fit_fold(
         optimizer.load_state_dict(saved.pop("optimizer"))
         _restore_rng_state(saved.pop("rng"), train_loader)
         state = saved
-        print(f"Fold {fold}: resuming after epoch {state['epoch']}", flush=True)
+        print(f"Fold {name}: resuming after epoch {state['epoch']}", flush=True)
 
     epoch = state["epoch"]
     while not state["finished"]:
@@ -261,7 +268,7 @@ def fit_fold(
         metrics = evaluate_predictions(predictions, config.threshold)
         patient_auc = metrics["patient"]["auc"]
         row = {
-            "fold": fold,
+            "fold": fold if paired_fold is None else name,
             "epoch": epoch,
             "train_loss": train_loss,
             "validation_loss": validation_loss,
@@ -286,7 +293,7 @@ def fit_fold(
                 best_train_auc=train_auc,
                 best_predictions=predictions.to_dict("list"),
             )
-            torch.save(model.state_dict(), run_dir / f"model_fold{fold}.pt")
+            torch.save(model.state_dict(), run_dir / f"model_fold{name}.pt")
         state["epoch"] = epoch
         state["finished"] = epoch >= config.epochs or (
             config.epoch_selection == "best"
@@ -307,13 +314,18 @@ def fit_fold(
         print(_progress_line(row, config.epochs, improved), flush=True)
 
     best_predictions = pd.DataFrame(state["best_predictions"])
-    best_predictions.insert(0, "fold", fold)
+    if paired_fold is None:
+        best_predictions.insert(0, "fold", fold)
+    else:
+        folds = validation_loader.dataset.samples.set_index("sample_id")["fold"]
+        best_predictions.insert(0, "fold", best_predictions["sample_id"].map(folds).astype(int))
+        best_predictions.insert(1, "model", name)
     best_auc, best_train_auc = state["best_auc"], state["best_train_auc"]
     return FoldResult(
         history=pd.DataFrame(state["history"]),
         predictions=best_predictions,
         metrics={
-            "fold": fold,
+            "fold": fold if paired_fold is None else name,
             "best_epoch": state["best_epoch"],
             "epochs_run": len(state["history"]),
             "pos_weight": pos_weight,

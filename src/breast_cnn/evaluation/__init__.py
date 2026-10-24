@@ -5,6 +5,7 @@ from breast_cnn.evaluation.calibration import (
     apply_platt,
     calibrate_and_threshold,
     fit_platt,
+    nested_ensemble_scores,
     specificity_threshold,
 )
 from breast_cnn.evaluation.ensemble import (
@@ -38,6 +39,7 @@ __all__ = [
     "fold_auc",
     "load_fold_models",
     "load_runs",
+    "nested_ensemble_scores",
     "paired_differences",
     "patient_scores",
     "patient_test_scores",

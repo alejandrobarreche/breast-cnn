@@ -39,9 +39,9 @@ def main() -> None:
     calibration = json.loads((root / analysis.slice_calibration_report_path).read_text("utf-8"))
     if calibration["run"] != analysis.final_run or calibration["unit"] != "slice":
         raise ValueError("The slice calibration does not belong to the final run")
-    maps = {int(fold): values for fold, values in calibration["folds"].items()}
     device = torch.device("cpu")
-    ensemble = CalibratedEnsemble(load_fold_models(root / analysis.final_run, device), maps)
+    models = load_fold_models(root / analysis.final_run, device)
+    ensemble = CalibratedEnsemble(models, calibration["platt"])
     ensemble.eval()
 
     path = root / analysis.onnx_path

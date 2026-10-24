@@ -68,19 +68,22 @@ def load_excluded_patients(
 
 
 def split_train_validation(
-    samples: pd.DataFrame, validation_fold: int
+    samples: pd.DataFrame, validation_fold: int | tuple[int, ...]
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split training rows by the existing patient-level fold assignment."""
-    if (
-        isinstance(validation_fold, bool)
-        or not isinstance(validation_fold, int)
-        or validation_fold not in range(5)
+    """Split training rows by the existing patient-level fold assignment.
+
+    A tuple of folds validates on all of them and trains on the remaining ones.
+    """
+    folds = validation_fold if isinstance(validation_fold, tuple) else (validation_fold,)
+    if not folds or any(
+        isinstance(fold, bool) or not isinstance(fold, int) or fold not in range(5)
+        for fold in folds
     ):
         raise ValueError(f"validation_fold must be between 0 and 4, got {validation_fold}")
 
     train_samples = samples.loc[samples["split"].eq("train")]
-    training = train_samples.loc[train_samples["fold"].ne(validation_fold)].copy()
-    validation = train_samples.loc[train_samples["fold"].eq(validation_fold)].copy()
+    training = train_samples.loc[~train_samples["fold"].isin(folds)].copy()
+    validation = train_samples.loc[train_samples["fold"].isin(folds)].copy()
 
     shared_patients = set(training["patient_id"]) & set(validation["patient_id"])
     if shared_patients:

@@ -57,6 +57,9 @@ class TrainConfig(BaseModel):
     train_slices_per_patient: int | None = Field(default=None, gt=0)
     threshold: float = Field(gt=0, lt=1)
     runs_dir: str
+    # One model per pair of `folds`, trained on the other folds and validated on both, so
+    # that each fold receives out-of-fold ensemble scores (threshold of the final ensemble).
+    nested: bool = False
 
     @field_validator("folds")
     @classmethod
@@ -77,6 +80,7 @@ class AnalysisConfig(BaseModel):
     confidence_level: float = Field(gt=0, lt=1)
     seed: int = Field(ge=0)
     final_run: str
+    nested_run: str | None
     min_specificity: float = Field(gt=0, lt=1)
     calibration_report_path: str
     slice_calibration_report_path: str
@@ -85,6 +89,7 @@ class AnalysisConfig(BaseModel):
     onnx_parity_slices: int = Field(gt=0)
     test_report_path: str
     test_predictions_path: str
+    corrected_test_report_path: str
 
 
 class DataConfig(BaseModel):

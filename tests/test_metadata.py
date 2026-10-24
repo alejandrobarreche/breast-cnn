@@ -32,6 +32,12 @@ def test_split_uses_patient_folds_and_excludes_test(dataset_project: Path) -> No
     assert set(training["patient_id"]).isdisjoint(validation["patient_id"])
     assert select_test_samples(samples)["patient_id"].tolist() == ["p3"]
 
+    training, validation = split_train_validation(samples, validation_fold=(0, 1))
+    assert training.empty
+    assert set(validation["patient_id"]) == {"p1", "p2"}
+    with pytest.raises(ValueError):
+        split_train_validation(samples, validation_fold=(0, 5))
+
 
 def test_resolve_image_path_uses_explicit_alias(dataset_project: Path) -> None:
     resolved = resolve_image_path(

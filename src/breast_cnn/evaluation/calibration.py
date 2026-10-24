@@ -1,6 +1,7 @@
-"""Per-fold Platt calibration of patient probabilities and a specificity-constrained threshold.
+"""Platt calibration of ensemble probabilities and a specificity-constrained threshold.
 
-Everything here is fitted on internal validation predictions only; test is never used.
+Everything here is fitted on the out-of-fold predictions of a nested run (internal
+validation only); test is never used.
 """
 
 from __future__ import annotations
@@ -40,23 +41,27 @@ def apply_platt(probabilities: np.ndarray, platt: dict) -> np.ndarray:
     return 1 / (1 + np.exp(-scores))
 
 
-def fit_fold_calibration(
-    predictions: pd.DataFrame, unit: str = "patient"
-) -> tuple[dict[int, dict], pd.DataFrame]:
-    """Fit one Platt map per fold model on its own validation fold, per patient or per slice.
+def nested_ensemble_scores(predictions: pd.DataFrame, unit: str = "patient") -> pd.DataFrame:
+    """Out-of-fold ensemble score of every validation unit of a nested run.
 
-    Returns the maps and the out-of-fold table (one row per unit) with raw and calibrated
-    probability. Patient probabilities are the mean over slices.
+    Each slice is scored by the models that never saw its fold (one per other fold) and its
+    score is their mean probability, as the final ensemble averages its fold models. Patient
+    scores are the mean over slices. One row per unit with fold, label and probability.
     """
     if unit not in ("patient", "slice"):
         raise ValueError(f"unit must be patient or slice, got {unit}")
-    maps, tables = {}, []
-    for fold, rows in predictions.groupby("fold"):
-        units = aggregate_patients(rows) if unit == "patient" else rows.copy()
-        maps[int(fold)] = fit_platt(units["probability"], units["label"])
-        units["calibrated"] = apply_platt(units["probability"], maps[int(fold)])
-        tables.append(units.assign(fold=int(fold)))
-    return maps, pd.concat(tables, ignore_index=True)
+    grouped = predictions.groupby(["fold", "sample_id", "patient_id"], sort=True)
+    counts = grouped["model"].nunique()
+    if counts.nunique() != 1:
+        raise ValueError("Every slice needs the same number of out-of-fold models")
+    slices = grouped.agg(label=("label", "first"), probability=("probability", "mean"))
+    slices = slices.reset_index()
+    if unit == "slice":
+        return slices
+    return pd.concat(
+        [aggregate_patients(rows).assign(fold=int(fold)) for fold, rows in slices.groupby("fold")],
+        ignore_index=True,
+    )
 
 
 def specificity_threshold(labels: np.ndarray, scores: np.ndarray, min_specificity: float) -> float:
@@ -74,32 +79,32 @@ def specificity_threshold(labels: np.ndarray, scores: np.ndarray, min_specificit
 def calibrate_and_threshold(
     predictions: pd.DataFrame, min_specificity: float, unit: str = "patient"
 ) -> dict:
-    """Calibration maps, the pooled out-of-fold threshold and its validation metrics.
+    """One Platt map and the threshold on the out-of-fold ensemble scores of a nested run.
 
-    `unit="slice"` serves the web application, which scores one slice at a time.
+    The map and the threshold apply to the mean probability of the final fold models, the
+    same kind of score. `unit="slice"` serves the web application, which scores one slice.
     """
-    maps, patients = fit_fold_calibration(predictions, unit)
-    threshold = specificity_threshold(patients["label"], patients["calibrated"], min_specificity)
+    units = nested_ensemble_scores(predictions, unit)
+    platt = fit_platt(units["probability"], units["label"])
+    units["calibrated"] = apply_platt(units["probability"], platt)
+    threshold = specificity_threshold(units["label"], units["calibrated"], min_specificity)
     per_fold = {}
-    for fold, rows in patients.groupby("fold"):
+    for fold, rows in units.groupby("fold"):
         per_fold[int(fold)] = {
-            **maps[int(fold)],
             "mean_raw_probability": float(rows["probability"].mean()),
             "mean_calibrated_probability": float(rows["calibrated"].mean()),
             "pcr_rate": float(rows["label"].mean()),
-            "raw_auc": binary_metrics(rows["label"], rows["probability"], threshold)["auc"],
             **binary_metrics(rows["label"], rows["calibrated"], threshold),
         }
     return {
         "unit": unit,
         "aggregation": "mean_probability_per_patient" if unit == "patient" else None,
-        "calibration": "platt_per_fold_on_own_validation_fold_slope_nonnegative",
-        # Test: AUC from the mean raw probability of the fold models (threshold-free);
-        # sensitivity and specificity from the mean calibrated probability at `threshold`.
-        "test_auc_score": "mean_raw_probability",
-        "test_threshold_score": "mean_calibrated_probability",
+        "score": "mean_probability_of_models_without_the_unit_fold",
+        "models_per_unit": int(predictions.groupby("sample_id")["model"].nunique().iloc[0]),
+        "calibration": "platt_on_out_of_fold_ensemble_mean_slope_nonnegative",
         "min_specificity": min_specificity,
+        "platt": platt,
         "threshold": threshold,
-        "pooled_validation": binary_metrics(patients["label"], patients["calibrated"], threshold),
+        "pooled_validation": binary_metrics(units["label"], units["calibrated"], threshold),
         "folds": per_fold,
     }

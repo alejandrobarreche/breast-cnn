@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import itertools
 import json
 import platform
 import statistics
@@ -114,13 +115,21 @@ def _train(
 ) -> Path:
     device = select_device()
     samples = load_samples(root, data.metadata_dir)
+    # Nested: one model per pair of folds, validated on both (see TrainConfig.nested).
+    models = (
+        itertools.combinations(config.folds, 2)
+        if config.nested
+        else ((fold, None) for fold in config.folds)
+    )
     results = []
-    for fold in config.folds:
-        result = fit_fold(root, data, config, model_config, samples, fold, device, run_dir)
+    for fold, paired_fold in models:
+        result = fit_fold(
+            root, data, config, model_config, samples, fold, device, run_dir, paired_fold
+        )
         results.append(result)
         auc = result.metrics["patient"]["auc"]
         print(
-            f"Fold {fold}: best epoch {result.metrics['best_epoch']}"
+            f"Fold {result.metrics['fold']}: best epoch {result.metrics['best_epoch']}"
             f"/{result.metrics['epochs_run']}, validation patient AUC {auc}",
             flush=True,
         )
@@ -134,7 +143,7 @@ def _train(
     _write_json(
         {
             "experiment": config.experiment,
-            "scope": "internal_validation_folds",
+            "scope": "nested_fold_pairs" if config.nested else "internal_validation_folds",
             "aggregation": "mean_probability_per_patient",
             "selection": {"best": "best_validation_patient_auc", "last": "last_epoch"}[
                 config.epoch_selection
