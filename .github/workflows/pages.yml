@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MODEL_TAG: model-v1
+  MODEL_TAG: model-v2
 
 jobs:
   build:

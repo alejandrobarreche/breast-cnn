@@ -13,8 +13,8 @@ changed with respect to the reference experiment, the validation patient AUC of 
 (epoch chosen without the evaluated fold, or the last epoch for fixed-epoch runs, and the
 optimistic best epoch), the mean learning curves, and the cohort-only baseline. And writes
 web/src/results.json for the results charts: the nested run's out-of-fold validation patients
-and the test patients (label, raw and calibrated mean probability), the patient threshold, and
-the per-fold history of the run whose curves fixed the number of epochs of the final model.
+and the test patients (label, raw and calibrated mean probability), the patient threshold, the
+counts of the first test evaluation (before the threshold correction), and the per-fold history of the run whose curves fixed the number of epochs of the final model.
 """
 
 import argparse
@@ -54,7 +54,7 @@ LAB_REFERENCE = "baseline_weighted"
 # Run whose per-fold curves fixed the number of epochs of the final model
 EPOCH_REFERENCE = "wide_crop128_slow"
 # Settings that identify a run or the machine, not the experiment
-IGNORED = {"experiment", "model", "folds", "seed", "num_workers", "runs_dir", "threshold"}
+IGNORED = {"experiment", "model", "folds", "seed", "num_workers", "runs_dir", "threshold", "nested"}
 
 
 def _stages(config: ModelConfig) -> list[dict]:
@@ -171,8 +171,17 @@ def _results(root: Path, analysis, calibration: dict) -> dict:
         r for r in load_runs(root / analysis.runs_dir) if r.experiment == EPOCH_REFERENCE
     )
     columns = ["train_loss", "validation_loss", "validation_patient_auc"]
+    first = json.loads((root / analysis.test_report_path).read_text("utf-8"))
     return {
         "threshold": calibration["threshold"],
+        # First test evaluation, before the post-test threshold correction
+        "first_test": {
+            "threshold": first["threshold"],
+            **{
+                k: first["at_threshold"][k]
+                for k in ("true_positives", "false_negatives", "true_negatives", "false_positives")
+            },
+        },
         # [fold, label, raw, calibrated] per validation patient; [label, raw, calibrated] in test
         "validation": [
             [int(r.fold), int(r.label), float(r.probability), float(r.calibrated)]

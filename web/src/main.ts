@@ -97,19 +97,28 @@ function renderResults() {
     { split: "Test", label: "sin pCR", values: byClass(test, 0, 0, 2), positive: false },
     { split: "Test", label: "pCR", values: byClass(test, 1, 0, 2), positive: true },
   ], R);
-  const range = (v: number[]) => `${comma(Math.min(...v))} a ${comma(Math.max(...v))}`;
+  const range = (v: number[]) => `${comma(Math.min(...v))} y ${comma(Math.max(...v))}`;
   const notes: [string, string][] = [
     ["Solapamiento.", "Las dos clases ocupan casi el mismo intervalo: la probabilidad estimada apenas separa a las pacientes con pCR de las que no la alcanzan."],
     ["Umbral.", `${comma(R, 3)}, fijado en validación como el menor valor con una especificidad de al menos el ${percent(manifest.model.min_specificity)} %. Una paciente se clasifica como pCR si su probabilidad lo alcanza.`],
-    ["Validación frente a test.", `En validación cada paciente recibe la probabilidad de un único modelo (el de su fold), entre ${range(valCal)}. En test es la media de los cinco modelos, entre ${range(testCal)}. ` +
-      `Promediar reduce la dispersión, por lo que casi ninguna paciente de test alcanza un umbral fijado sobre las puntuaciones de un solo modelo; es la explicación más probable de la sensibilidad nula en test.`],
+    ["Misma puntuación en validación y en test.", `En validación, cada paciente recibe la media de los cuatro modelos que no vieron su fold, entre ${range(valCal)}. En test recibe la media de los cinco modelos finales, entre ${range(testCal)}. ` +
+      `El umbral se elige sobre el mismo tipo de puntuación al que después se aplica.`],
   ];
   $("distribution-notes").replaceChildren(...notes.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
 
   const valCm = confusion(val.map((p) => p[1]), valCal, R), testCm = confusion(test.map((p) => p[0]), testCal, R);
-  $("confusion-lead").textContent = `Con el umbral de ${comma(R, 3)} sobre la probabilidad calibrada por paciente. Validación: los cinco folds fuera de muestra, juntos.`;
+  $("confusion-lead").textContent = `Con el umbral de ${comma(R, 3)} sobre la probabilidad calibrada por paciente. En validación, cada paciente con la media de los cuatro modelos que no vieron su fold.`;
   renderConfusion($("confusion-validation"), "Validación interna", valCm);
-  renderConfusion($("confusion-test"), "Test", testCm);
+  renderConfusion($("confusion-test"), "Test con el umbral corregido", testCm);
+  const first = results.first_test;
+  const firstSpecificity = first.true_negatives / (first.true_negatives + first.false_positives);
+  const correction: [string, string][] = [
+    ["Corrección posterior al test.", `En la primera evaluación, el umbral (${comma(first.threshold, 3)}) se había elegido sobre la probabilidad de un único modelo y se aplicó a la media de cinco, que tiene menos dispersión. ` +
+      `Ninguna de las ${first.true_positives + first.false_negatives} pacientes con pCR lo alcanzó (especificidad ${comma(firstSpecificity)}).`],
+    ["Cómo se corrigió.", "Se entrenó un modelo por cada par de folds para obtener, en validación, la media de cuatro modelos que no han visto a la paciente. El mapa de Platt y el umbral se ajustaron sobre esa media, sin usar test, y test se volvió a evaluar con las mismas predicciones."],
+    ["Alcance.", "La sensibilidad y la especificidad de test con el umbral corregido se conocieron después de ver la primera evaluación, por lo que no son una estimación independiente. El AUC no cambia: la calibración y el umbral no alteran el orden de las pacientes."],
+  ];
+  $("confusion-notes").replaceChildren(...correction.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
 }
 function renderConfusion(node: HTMLElement, title: string, c: Confusion) {
   const n = c.tp + c.fn + c.tn + c.fp;
@@ -150,6 +159,7 @@ function renderLimits() {
   const items = [
     `Discriminación modesta: AUC ${comma(s.auc.value)} en test (IC 95 % ${comma(s.auc.lower)} a ${comma(s.auc.upper)}).`,
     `Con el umbral elegido, la mayoría de los casos con pCR se clasifican como «sin pCR» (sensibilidad ${comma(v.sensitivity!, 2)}).`,
+    "El umbral se corrigió después de evaluar test; sus cifras de sensibilidad y especificidad en test no son una estimación independiente.",
     "Un único corte 2D, sin el volumen completo ni datos clínicos.",
     "Cinco muestras comprueban que la aplicación funciona, no su rendimiento.",
     "Uso educativo, sin validez clínica: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.",
@@ -308,7 +318,7 @@ const STEP_TEXT = [
   ...arch.stages.map((stage, i) =>
     `${stage.convs} convoluciones ${arch.kernel_size} × ${arch.kernel_size}: ${i ? arch.stages[i - 1].channels : 3} → ${stage.channels} mapas. Max pooling: ${stage.size} → ${stage.size / 2} píxeles.`),
   `Promedio global de los ${arch.stages[arch.stages.length - 1].channels} mapas, dropout ${comma(arch.dropout, 1)} (solo en entrenamiento) y una capa lineal: un logit.`,
-  `Platt en cada uno de los ${arch.models} modelos, media de las probabilidades y umbral de ${percent(THRESHOLD)} %.`,
+  `Media de las probabilidades de los ${arch.models} modelos, un único mapa de Platt sobre esa media y umbral de ${percent(THRESHOLD)} %.`,
 ];
 const stepButtons = STEPS.map((step, i) => {
   const button = make("button", "step-tab");
@@ -615,13 +625,10 @@ function showResult(prediction: Prediction | null, animate = true) {
   pill.textContent = positive ? "pCR" : "Sin pCR";
   const f = prediction.foldCalibrated;
   const low = Math.min(...f), high = Math.max(...f);
-  const split = low < THRESHOLD && high >= THRESHOLD;
   $("reading").textContent =
     `El modelo estima una probabilidad de pCR del ${percent(prediction.calibrated)} %, ` +
     `${positive ? "igual o superior" : "inferior"} al umbral de ${percent(THRESHOLD)} %. ` +
-    (split
-      ? `Los cinco modelos no coinciden en la clase (${percent(low)} – ${percent(high)} %): la estimación es incierta.`
-      : `Los cinco modelos coinciden en la clase (${percent(low)} – ${percent(high)} %).`);
+    `Por separado, los cinco modelos dan entre el ${percent(low)} y el ${percent(high)} %; el umbral se aplica a su media.`;
   $("f-spread").textContent = `${percent(low)} – ${percent(high)} %`;
   $("f-time").textContent = `${Math.max(1, Math.round(prediction.milliseconds))} ms`;
 }

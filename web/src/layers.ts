@@ -53,10 +53,10 @@ export function steps(stages: StageSpec[], kernel: number, inChannels: number, c
     params: channels + 1, field, jump, outSize: 1,
   });
   out.push({
-    title: "Calibración y media",
+    title: "Media y calibración",
     layers: [
-      { name: `Platt en cada uno de los ${models} modelos: σ(a · logit + b)`, shape: `${models} probabilidades`, params: 0 },
-      { name: `Media de las ${models} probabilidades calibradas`, shape: "P(pCR)", params: 0 },
+      { name: `Media de las probabilidades de los ${models} modelos`, shape: "1 probabilidad", params: 0 },
+      { name: "Platt sobre la media: σ(a · logit + b)", shape: "P(pCR)", params: 0 },
     ],
     params: 0, field, jump, outSize: 1,
   });

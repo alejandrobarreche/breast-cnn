@@ -127,7 +127,7 @@
             <span class="chapter-n" aria-hidden="true">2</span>
             <div>
               <h2 id="red-title">Arquitectura</h2>
-              <p class="chapter-lead">Una red entrenada cinco veces, una por fold; la salida es la media de sus probabilidades calibradas.</p>
+              <p class="chapter-lead">Una red entrenada cinco veces, una por fold; la salida es la media de sus cinco probabilidades, calibrada.</p>
             </div>
           </div>
         </header>
@@ -234,7 +234,7 @@
             <span class="chapter-n" aria-hidden="true">4</span>
             <div>
               <h2 id="res-sec-title">Resultados</h2>
-              <p class="chapter-lead">Las decisiones se tomaron con la validación cruzada; el test se evaluó una sola vez, al final.</p>
+              <p class="chapter-lead">Las decisiones se tomaron con la validación cruzada y el test se evaluó al final. Después se corrigió el umbral, como se explica en la clasificación.</p>
             </div>
           </div>
         </header>
@@ -290,6 +290,7 @@
               <div class="confusion" id="confusion-validation"></div>
               <div class="confusion" id="confusion-test"></div>
             </div>
+            <div class="notes" id="confusion-notes"></div>
           </div>
         </div>
       </section>

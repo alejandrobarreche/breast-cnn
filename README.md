@@ -223,7 +223,7 @@ cd web && npm install && npm test   # incluye la paridad con las salidas de Pyth
 npm run dev                         # http://localhost:5173
 ```
 
-Se publica en <https://alejandrobarreche.github.io/breast-cnn/> con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v1` y comprueba su SHA-256 contra `web/src/manifest.json`.
+Se publica en <https://alejandrobarreche.github.io/breast-cnn/> con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v2` y comprueba su SHA-256 contra `web/src/manifest.json`.
 
 ---
 

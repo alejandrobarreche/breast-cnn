@@ -79,7 +79,7 @@ analysis:
   final_run: runs/20261018-1330_wide_crop128_fixed
   # Same protocol with nested: true. The calibration map and the threshold are fitted on its
   # out-of-fold ensemble scores, the same kind of score the final ensemble gives on test.
-  nested_run: null
+  nested_run: runs/20261024-1255_wide_crop128_nested
   min_specificity: 0.9
   calibration_report_path: artifacts/metrics/calibration_validation_patient.json
   # Same protocol per slice, for the web application (one slice per prediction).

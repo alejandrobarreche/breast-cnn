@@ -11,13 +11,13 @@ describe("results charts", () => {
   });
 
   it("reproduces the per-fold validation AUC of fit_calibration.py", () => {
-    // artifacts/metrics/calibration_validation_patient.json, folds.0.auc
+    // artifacts/metrics/calibration_validation_patient.json, folds.0.auc (nested out-of-fold ensemble)
     const fold = val.filter((p) => p[0] === 0);
-    expect(auc(roc(fold.map((p) => p[1]), fold.map((p) => p[2])))).toBeCloseTo(0.5744959677419356, 12);
+    expect(auc(roc(fold.map((p) => p[1]), fold.map((p) => p[2])))).toBeCloseTo(0.5339717741935484, 12);
   });
 
   it("reproduces the test confusion matrix at the threshold", () => {
-    // artifacts/metrics/test_evaluation_patient.json, at_threshold
-    expect(confusion(test.map((p) => p[0]), test.map((p) => p[2]), results.threshold)).toEqual({ tp: 0, fn: 53, tn: 121, fp: 2 });
+    // artifacts/metrics/test_evaluation_patient_corrected.json, at_threshold
+    expect(confusion(test.map((p) => p[0]), test.map((p) => p[2]), results.threshold)).toEqual({ tp: 12, fn: 41, tn: 109, fp: 14 });
   });
 });
