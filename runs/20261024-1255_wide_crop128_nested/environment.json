@@ -1,0 +1,20 @@
+{
+  "commit": "eaa8f2a9a7cedb81ed62f07e1ab3cbccdf8af2de",
+  "uncommitted_changes": false,
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "python": "3.12.14",
+  "device": "mps",
+  "gpu": null,
+  "cuda": null,
+  "versions": {
+    "breast-cnn": "0.0.0",
+    "torch": "2.14.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1"
+  },
+  "batch_size": 32,
+  "total_seconds": 643.7494397050177,
+  "mean_epoch_seconds": 21.458314656833924,
+  "peak_gpu_memory_bytes": null
+}
