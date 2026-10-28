@@ -316,6 +316,19 @@ def test_cosine_schedule_and_ema_weights_are_evaluated_and_saved(training_projec
         )
 
 
+def test_cosine_schedule_can_be_longer_than_training(training_project: Path) -> None:
+    data, config = smoke_config(
+        epochs=2, epoch_selection="last", lr_schedule="cosine", lr_schedule_epochs=4
+    )
+    run_dir = run_experiment(training_project, data, config)
+    history = pd.read_csv(run_dir / "history.csv")
+    # Epochs 1 and 2 of a 4-epoch cosine: 1e-3 and 1e-3 (1 + cos(pi / 4)) / 2.
+    for _, rows in history.groupby("fold"):
+        assert rows["learning_rate"].tolist() == pytest.approx([0.001, 0.00085355339])
+    with pytest.raises(ValueError, match="at least epochs"):
+        smoke_config(epochs=5, lr_schedule_epochs=4)
+
+
 def test_ema_warms_up_and_averages_parameters_and_batchnorm_statistics() -> None:
     from torch.optim.swa_utils import AveragedModel
 

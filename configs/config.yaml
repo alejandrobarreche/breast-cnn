@@ -46,7 +46,8 @@ train:
   optimizer: adamw  # adamw | sgd (momentum 0.9)
   learning_rate: 0.001
   weight_decay: 0.0001
-  lr_schedule: constant  # constant | cosine (decays to 0 over `epochs`)
+  lr_schedule: constant  # constant | cosine (decays to 0 over `lr_schedule_epochs`)
+  lr_schedule_epochs: null  # null: `epochs`; larger values stop part of the way through
   # Exponential moving average of the weights for validation and saved models; null: off.
   ema_decay: null
   horizontal_flip_probability: 0.5

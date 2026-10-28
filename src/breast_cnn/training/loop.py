@@ -222,7 +222,7 @@ def fit_fold(
     identical to an uninterrupted run; with workers, augmentation draws differ.
 
     With `lr_schedule: cosine` the learning rate decays from `learning_rate` to 0 over
-    `epochs` epochs. With `ema_decay`, validation and the saved weights use the exponential
+    `lr_schedule_epochs` epochs (default `epochs`). With `ema_decay`, validation and the saved weights use the exponential
     moving average of the weights with warm-up (`ema_with_warmup`, BatchNorm statistics
     included); the training AUC still
     comes from the weights being optimised.
@@ -269,7 +269,9 @@ def fit_fold(
             model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
         )
     scheduler = (
-        torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
+        torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=config.lr_schedule_epochs or config.epochs
+        )
         if config.lr_schedule == "cosine"
         else None
     )

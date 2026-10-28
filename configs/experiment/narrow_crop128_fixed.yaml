@@ -1,0 +1,17 @@
+# @package _global_
+# narrow_crop128_cosine_ema stopped at epoch 8 of its 40-epoch cosine schedule, keeping the last
+# epoch. Epoch 8 maximises the mean validation curve of the other four folds in four of the five
+# folds of narrow_crop128_cosine_ema (the fifth gives 7).
+train:
+  experiment: narrow_crop128_fixed
+  weighted_loss: true
+  model: configs/model/narrow_crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
+  lr_schedule: cosine
+  lr_schedule_epochs: 40
+  ema_decay: 0.998
+  epochs: 8
+  epoch_selection: last

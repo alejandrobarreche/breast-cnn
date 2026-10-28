@@ -5,7 +5,7 @@ from typing import Literal
 
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PipelineConfig(BaseModel):
@@ -46,6 +46,9 @@ class TrainConfig(BaseModel):
     weight_decay: float = Field(ge=0)
     # constant: fixed learning rate. cosine: decays from learning_rate to 0 over `epochs`.
     lr_schedule: Literal["constant", "cosine"] = "constant"
+    # Length of the cosine schedule; None: `epochs`. Larger than `epochs` stops training part
+    # of the way through the schedule (e.g. epoch 8 of a 40-epoch cosine).
+    lr_schedule_epochs: int | None = Field(default=None, gt=0)
     # Decay of the exponential moving average of the weights used for validation and the
     # saved models; None: the optimised weights themselves.
     ema_decay: float | None = Field(default=None, gt=0, lt=1)
@@ -65,6 +68,12 @@ class TrainConfig(BaseModel):
     # One model per pair of `folds`, trained on the other folds and validated on both, so
     # that each fold receives out-of-fold ensemble scores (threshold of the final ensemble).
     nested: bool = False
+
+    @model_validator(mode="after")
+    def check_schedule_length(self) -> "TrainConfig":
+        if self.lr_schedule_epochs is not None and self.lr_schedule_epochs < self.epochs:
+            raise ValueError("lr_schedule_epochs must be at least epochs")
+        return self
 
     @field_validator("folds")
     @classmethod

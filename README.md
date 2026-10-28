@@ -189,6 +189,8 @@ python scripts/train.py +experiment=crop128_cosine_ema         # lo anterior con
 python scripts/train.py +experiment=narrow_crop128_cosine_ema  # lo anterior con 4-64 canales (≈74.000 parámetros)
 python scripts/train.py +experiment=crop128_cosine_ema_decay   # crop128_cosine_ema con decaimiento de pesos 0,5
 python scripts/train.py +experiment=tiny_crop128_cosine_ema    # narrow_crop128_cosine_ema con 2-32 canales (≈19.000 parámetros)
+python scripts/train.py +experiment=narrow_crop128_fixed       # narrow_crop128_cosine_ema detenido en la época 8 de su coseno de 40
+python scripts/train.py +experiment=narrow_crop128_fixed_nested  # lo anterior con un modelo por pareja de folds (umbral del ensemble)
 ```
 
 Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente). Por ejemplo, la batería de entrada, capacidad y optimización (justificación en `documentation/research/pcr_input_and_training.md`):
