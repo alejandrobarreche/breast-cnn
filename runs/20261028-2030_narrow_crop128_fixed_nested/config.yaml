@@ -1,0 +1,66 @@
+data:
+  metadata_dir: metadata
+  image_path_aliases:
+    dataset: data
+  expected_image_size:
+  - 256
+  - 256
+train:
+  experiment: narrow_crop128_fixed_nested
+  model: configs/model/narrow_crop128.yaml
+  folds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  seed: 2026
+  epochs: 8
+  early_stopping_patience: 8
+  epoch_selection: last
+  batch_size: 32
+  num_workers: 4
+  optimizer: adamw
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  lr_schedule: cosine
+  lr_schedule_epochs: 40
+  ema_decay: 0.998
+  horizontal_flip_probability: 0.5
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range:
+  - 0.9
+  - 1.1
+  weighted_loss: true
+  loss_unit: slice
+  patient_pooling: mean
+  patients_per_batch: 3
+  label_smoothing: 0.0
+  train_slices_per_patient: null
+  threshold: 0.5
+  runs_dir: runs
+  nested: true
+model:
+  in_channels: 3
+  kernel_size: 3
+  activation: relu
+  stages:
+  - channels: 4
+    convs: 2
+    conv: standard
+  - channels: 8
+    convs: 2
+    conv: standard
+  - channels: 16
+    convs: 2
+    conv: standard
+  - channels: 32
+    convs: 2
+    conv: standard
+  - channels: 64
+    convs: 2
+    conv: standard
+  dropout: 0.3
+  input_crop: 128
+  input_pool: 1
