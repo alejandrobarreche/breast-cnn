@@ -282,10 +282,13 @@ def plot_learning_curves(
         loss_axis.set(xlabel="Época", ylabel="BCE")
         auc_axis.axhline(0.5, color=GRID, linewidth=1.5)
         auc_axis.set(xlabel="Época", ylabel="ROC-AUC", ylim=(0.3, 1.05))
+        loss_axis.yaxis.set_major_formatter(
+            FuncFormatter(lambda value, _: f"{value:.2f}".replace(".", ","))
+        )
+        auc_axis.yaxis.set_major_formatter(
+            FuncFormatter(lambda value, _: f"{value:.1f}".replace(".", ","))
+        )
         for axis in (loss_axis, auc_axis):
-            axis.yaxis.set_major_formatter(
-                FuncFormatter(lambda value, _: f"{value:.1f}".replace(".", ","))
-            )
             axis.xaxis.set_major_locator(MaxNLocator(integer=True))
             axis.grid(axis="y")
     return figure

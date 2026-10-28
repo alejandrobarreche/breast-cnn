@@ -64,6 +64,31 @@ def nested_ensemble_scores(predictions: pd.DataFrame, unit: str = "patient") -> 
     )
 
 
+def model_patient_scores(predictions: pd.DataFrame) -> pd.DataFrame:
+    """Patient probability of each model of a nested run on the folds it never saw.
+
+    One row per fold, model and patient; the probability is the mean over slices.
+    """
+    return (
+        predictions.groupby(["fold", "model", "patient_id"], sort=True)
+        .agg(label=("label", "first"), probability=("probability", "mean"))
+        .reset_index()
+    )
+
+
+def reliability_bins(labels: np.ndarray, probabilities: np.ndarray, bins: int) -> pd.DataFrame:
+    """Mean predicted probability and observed pCR rate in quantile bins of the probability.
+
+    Quantile bins hold about the same number of units, so every observed rate has a similar
+    sampling error.
+    """
+    frame = pd.DataFrame({"label": np.asarray(labels), "probability": np.asarray(probabilities)})
+    frame["bin"] = pd.qcut(frame["probability"], bins, labels=False, duplicates="drop")
+    return frame.groupby("bin").agg(
+        predicted=("probability", "mean"), observed=("label", "mean"), n=("label", "size")
+    )
+
+
 def specificity_threshold(labels: np.ndarray, scores: np.ndarray, min_specificity: float) -> float:
     """Lowest threshold whose specificity (score < threshold among negatives) is at least the
     minimum; the lowest such threshold gives the highest sensitivity under the constraint.
