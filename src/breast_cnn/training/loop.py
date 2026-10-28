@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
+from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
 from torch.utils.data import DataLoader
 
 from breast_cnn.configuration import DataConfig, TrainConfig
@@ -81,12 +82,14 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     label_smoothing: float = 0.0,
+    ema: AveragedModel | None = None,
 ) -> tuple[float, pd.DataFrame]:
     """One pass of minibatch gradient descent; returns the mean loss and running predictions.
 
     The predictions are those produced while training (dropout and augmentation active,
     weights changing within the epoch). They cost nothing extra and give a slightly
     pessimistic estimate of the training AUC, as Keras-style training metrics do.
+    With `ema`, the moving average of the weights is updated after every optimizer step.
     """
     model.train()
     total, units, rows = 0.0, 0, []
@@ -97,6 +100,8 @@ def train_one_epoch(
         loss, count = objective(logits, labels, batch["patient_id"], label_smoothing)
         loss.backward()
         optimizer.step()
+        if ema is not None:
+            ema.update_parameters(model)
         total += loss.item() * count
         units += count
         rows.append(
@@ -191,6 +196,11 @@ def fit_fold(
     After every epoch the full state is saved to `checkpoint_fold<k>.pt`; if that file
     exists, training continues from it. With `num_workers=0` the continuation is
     identical to an uninterrupted run; with workers, augmentation draws differ.
+
+    With `lr_schedule: cosine` the learning rate decays from `learning_rate` to 0 over
+    `epochs` epochs. With `ema_decay`, validation and the saved weights use the exponential
+    moving average of the weights (BatchNorm statistics included); the training AUC still
+    comes from the weights being optimised.
     """
     validation_folds = fold if paired_fold is None else (fold, paired_fold)
     name = str(fold) if paired_fold is None else f"{fold}-{paired_fold}"
@@ -233,6 +243,17 @@ def fit_fold(
         optimizer = torch.optim.AdamW(
             model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
         )
+    scheduler = (
+        torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
+        if config.lr_schedule == "cosine"
+        else None
+    )
+    ema = (
+        AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(config.ema_decay), use_buffers=True)
+        if config.ema_decay is not None
+        else None
+    )
+    evaluated = model if ema is None else ema.module
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
 
@@ -252,6 +273,11 @@ def fit_fold(
         saved = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         model.load_state_dict(saved.pop("model"))
         optimizer.load_state_dict(saved.pop("optimizer"))
+        scheduler_state, ema_state = saved.pop("scheduler"), saved.pop("ema")
+        if scheduler is not None:
+            scheduler.load_state_dict(scheduler_state)
+        if ema is not None:
+            ema.load_state_dict(ema_state)
         _restore_rng_state(saved.pop("rng"), train_loader)
         state = saved
         print(f"Fold {name}: resuming after epoch {state['epoch']}", flush=True)
@@ -260,11 +286,14 @@ def fit_fold(
     while not state["finished"]:
         epoch += 1
         start = time.perf_counter()
+        learning_rate = optimizer.param_groups[0]["lr"]
         train_loss, train_predictions = train_one_epoch(
-            model, train_loader, objective, optimizer, device, config.label_smoothing
+            model, train_loader, objective, optimizer, device, config.label_smoothing, ema
         )
+        if scheduler is not None:
+            scheduler.step()
         train_auc = evaluate_predictions(train_predictions, config.threshold)["patient"]["auc"]
-        validation_loss, predictions = predict(model, validation_loader, objective, device)
+        validation_loss, predictions = predict(evaluated, validation_loader, objective, device)
         metrics = evaluate_predictions(predictions, config.threshold)
         patient_auc = metrics["patient"]["auc"]
         row = {
@@ -275,6 +304,7 @@ def fit_fold(
             "train_patient_auc": train_auc,
             "validation_slice_auc": metrics["slice"]["auc"],
             "validation_patient_auc": patient_auc,
+            "learning_rate": learning_rate,
             "seconds": time.perf_counter() - start,
         }
         state["history"].append(row)
@@ -293,7 +323,7 @@ def fit_fold(
                 best_train_auc=train_auc,
                 best_predictions=predictions.to_dict("list"),
             )
-            torch.save(model.state_dict(), run_dir / f"model_fold{name}.pt")
+            torch.save(evaluated.state_dict(), run_dir / f"model_fold{name}.pt")
         state["epoch"] = epoch
         state["finished"] = epoch >= config.epochs or (
             config.epoch_selection == "best"
@@ -307,6 +337,8 @@ def fit_fold(
                 **state,
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
+                "scheduler": None if scheduler is None else scheduler.state_dict(),
+                "ema": None if ema is None else ema.state_dict(),
                 "rng": _rng_state(train_loader),
             },
             checkpoint_path,

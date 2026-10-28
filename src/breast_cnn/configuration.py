@@ -44,6 +44,11 @@ class TrainConfig(BaseModel):
     optimizer: Literal["adamw", "sgd"]  # sgd: momentum 0.9
     learning_rate: float = Field(gt=0)
     weight_decay: float = Field(ge=0)
+    # constant: fixed learning rate. cosine: decays from learning_rate to 0 over `epochs`.
+    lr_schedule: Literal["constant", "cosine"] = "constant"
+    # Decay of the exponential moving average of the weights used for validation and the
+    # saved models; None: the optimised weights themselves.
+    ema_decay: float | None = Field(default=None, gt=0, lt=1)
     horizontal_flip_probability: float = Field(ge=0, le=1)
     rotation_degrees: float = Field(ge=0, le=180)
     max_translation: float = Field(ge=0, lt=1)

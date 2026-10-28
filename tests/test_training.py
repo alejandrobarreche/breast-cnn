@@ -244,12 +244,15 @@ def test_nested_run_trains_one_model_per_fold_pair(training_project: Path) -> No
     assert load_runs(training_project / "runs") == []
 
 
-@pytest.mark.parametrize("loss_unit", ["slice", "patient"])
+@pytest.mark.parametrize(
+    "changes",
+    [{"loss_unit": "slice"}, {"loss_unit": "patient"}, {"lr_schedule": "cosine", "ema_decay": 0.9}],
+)
 def test_resume_continues_interrupted_run_identically(
-    training_project: Path, monkeypatch: pytest.MonkeyPatch, loss_unit: str
+    training_project: Path, monkeypatch: pytest.MonkeyPatch, changes: dict
 ) -> None:
     data, reference_config = smoke_config(
-        runs_dir="reference", early_stopping_patience=5, loss_unit=loss_unit
+        runs_dir="reference", early_stopping_patience=5, **changes
     )
     reference = run_experiment(training_project, data, reference_config)
 
@@ -263,9 +266,7 @@ def test_resume_continues_interrupted_run_identically(
         return original_predict(*args, **kwargs)
 
     monkeypatch.setattr(loop, "predict", interrupted_predict)
-    data, config = smoke_config(
-        runs_dir="interrupted", early_stopping_patience=5, loss_unit=loss_unit
-    )
+    data, config = smoke_config(runs_dir="interrupted", early_stopping_patience=5, **changes)
     with pytest.raises(KeyboardInterrupt):
         run_experiment(training_project, data, config)
     monkeypatch.setattr(loop, "predict", original_predict)
@@ -274,12 +275,61 @@ def test_resume_continues_interrupted_run_identically(
 
     resume_experiment(training_project, run_dir)
 
-    columns = ["fold", "epoch", "train_loss", "validation_loss", "validation_patient_auc"]
+    columns = [
+        "fold",
+        "epoch",
+        "train_loss",
+        "validation_loss",
+        "validation_patient_auc",
+        "learning_rate",
+    ]
     expected = pd.read_csv(reference / "history.csv")[columns]
     resumed = pd.read_csv(run_dir / "history.csv")[columns]
     pd.testing.assert_frame_equal(resumed, expected)
     with pytest.raises(ValueError, match="never rewritten"):
         resume_experiment(training_project, run_dir)
+
+
+def test_cosine_schedule_and_ema_weights_are_evaluated_and_saved(training_project: Path) -> None:
+    data, config = smoke_config(
+        epochs=3, epoch_selection="last", lr_schedule="cosine", ema_decay=0.5
+    )
+    run_dir = run_experiment(training_project, data, config)
+    history = pd.read_csv(run_dir / "history.csv")
+    # Learning rate at the start of each epoch: 1e-3 (1 + cos(pi * (e - 1) / 3)) / 2.
+    expected = [0.001, 0.00075, 0.00025]
+    for _, rows in history.groupby("fold"):
+        assert rows["learning_rate"].tolist() == pytest.approx(expected)
+
+    # The saved weights are the averaged ones: they reproduce the stored predictions.
+    models = load_fold_models(run_dir, torch.device("cpu"))
+    samples = pd.read_csv(training_project / "metadata/samples.csv")
+    ensemble = predict_ensemble(models, samples, training_project, data, torch.device("cpu"))
+    stored = pd.read_csv(run_dir / "predictions_validation.csv")
+    for fold in (0, 3):
+        expected_probability = stored.loc[stored["fold"].eq(fold)].set_index("sample_id")
+        actual = ensemble.set_index("sample_id").loc[
+            expected_probability.index, f"probability_fold{fold}"
+        ]
+        assert actual.tolist() == pytest.approx(
+            expected_probability["probability"].tolist(), abs=1e-6
+        )
+
+
+def test_ema_averages_parameters_and_batchnorm_statistics() -> None:
+    from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
+
+    model = nn.Sequential(nn.Linear(1, 1, bias=False), nn.BatchNorm1d(1))
+    ema = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(0.75), use_buffers=True)
+    with torch.no_grad():
+        model[0].weight.fill_(0.0)
+        model[1].running_mean.fill_(0.0)
+        ema.update_parameters(model)  # first update copies the weights
+        model[0].weight.fill_(4.0)
+        model[1].running_mean.fill_(8.0)
+        ema.update_parameters(model)
+    assert ema.module[0].weight.item() == pytest.approx(1.0)
+    assert ema.module[1].running_mean.item() == pytest.approx(2.0)
 
 
 def test_patient_objective_pools_slice_logits_per_patient() -> None:
