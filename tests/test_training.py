@@ -316,20 +316,26 @@ def test_cosine_schedule_and_ema_weights_are_evaluated_and_saved(training_projec
         )
 
 
-def test_ema_averages_parameters_and_batchnorm_statistics() -> None:
-    from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
+def test_ema_warms_up_and_averages_parameters_and_batchnorm_statistics() -> None:
+    from torch.optim.swa_utils import AveragedModel
 
     model = nn.Sequential(nn.Linear(1, 1, bias=False), nn.BatchNorm1d(1))
-    ema = AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(0.75), use_buffers=True)
+    ema = AveragedModel(model, multi_avg_fn=loop.ema_with_warmup(0.75), use_buffers=True)
     with torch.no_grad():
         model[0].weight.fill_(0.0)
         model[1].running_mean.fill_(0.0)
         ema.update_parameters(model)  # first update copies the weights
         model[0].weight.fill_(4.0)
         model[1].running_mean.fill_(8.0)
+        ema.update_parameters(model)  # n = 1: decay (1 + 1) / (10 + 1) = 2/11
+        assert ema.module[0].weight.item() == pytest.approx(4 * 9 / 11)
+        assert ema.module[1].running_mean.item() == pytest.approx(8 * 9 / 11)
+
+        ema.n_averaged.fill_(100)  # (1 + 100) / (10 + 100) > 0.75: the decay is capped
+        model[0].weight.fill_(0.0)
+        before = ema.module[0].weight.item()
         ema.update_parameters(model)
-    assert ema.module[0].weight.item() == pytest.approx(1.0)
-    assert ema.module[1].running_mean.item() == pytest.approx(2.0)
+    assert ema.module[0].weight.item() == pytest.approx(0.75 * before)
 
 
 def test_patient_objective_pools_slice_logits_per_patient() -> None:

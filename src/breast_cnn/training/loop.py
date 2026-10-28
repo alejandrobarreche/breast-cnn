@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import nn
-from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
+from torch.optim.swa_utils import AveragedModel
 from torch.utils.data import DataLoader
 
 from breast_cnn.configuration import DataConfig, TrainConfig
@@ -37,6 +37,30 @@ def positive_class_weight(labels: pd.Series) -> float:
     if positives == 0 or negatives == 0:
         raise ValueError("The training split must contain both classes")
     return negatives / positives
+
+
+def ema_with_warmup(decay: float):
+    """Exponential moving average whose decay is min(decay, (1 + n) / (10 + n)) after n updates.
+
+    With a fixed decay the average keeps decay^n of the random initial weights (with 0.998,
+    about 58 % after one epoch of 275 steps). The warm-up rule of
+    tf.train.ExponentialMovingAverage lets the average follow the first updates closely and
+    widens its window as training proceeds. Integer buffers (num_batches_tracked) are blended
+    and truncated, as in torch.optim.swa_utils.get_ema_multi_avg_fn.
+    """
+
+    def update(
+        averaged: list[torch.Tensor], current: list[torch.Tensor], num_averaged: torch.Tensor
+    ) -> None:
+        n = int(num_averaged)
+        rate = min(decay, (1 + n) / (10 + n))
+        for average, value in zip(averaged, current, strict=True):
+            if torch.is_floating_point(average):
+                average.lerp_(value, 1 - rate)
+            else:
+                average.copy_(average * rate + value * (1 - rate))
+
+    return update
 
 
 @dataclass(frozen=True)
@@ -199,7 +223,8 @@ def fit_fold(
 
     With `lr_schedule: cosine` the learning rate decays from `learning_rate` to 0 over
     `epochs` epochs. With `ema_decay`, validation and the saved weights use the exponential
-    moving average of the weights (BatchNorm statistics included); the training AUC still
+    moving average of the weights with warm-up (`ema_with_warmup`, BatchNorm statistics
+    included); the training AUC still
     comes from the weights being optimised.
     """
     validation_folds = fold if paired_fold is None else (fold, paired_fold)
@@ -249,7 +274,7 @@ def fit_fold(
         else None
     )
     ema = (
-        AveragedModel(model, multi_avg_fn=get_ema_multi_avg_fn(config.ema_decay), use_buffers=True)
+        AveragedModel(model, multi_avg_fn=ema_with_warmup(config.ema_decay), use_buffers=True)
         if config.ema_decay is not None
         else None
     )

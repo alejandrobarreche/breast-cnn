@@ -1,7 +1,7 @@
 # @package _global_
 # wide_crop128_slow with a cosine learning-rate schedule and an exponential moving average
-# of the weights (decay 0.998, about two epochs of updates). The cosine schedule needs the
-# whole budget, so early stopping is disabled and the full validation curve is kept.
+# of the weights (decay 0.998 after a warm-up, about two epochs of updates). The cosine
+# schedule needs the whole budget, so early stopping is disabled and the full curve is kept.
 train:
   experiment: wide_crop128_cosine_ema
   weighted_loss: true
