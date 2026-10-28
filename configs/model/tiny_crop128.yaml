@@ -1,0 +1,14 @@
+# narrow_crop128 with half the channels per stage again (about a quarter of the parameters).
+# Same depth and receptive field as crop128.
+# Input [3, 256, 256] with channels PRE, EARLY, LATE (early fusion of the DCE phases).
+in_channels: 3
+kernel_size: 3
+activation: relu  # relu | leaky_relu | elu | gelu
+input_crop: 128
+stages:
+  - {channels: 2, convs: 2}
+  - {channels: 4, convs: 2}
+  - {channels: 8, convs: 2}
+  - {channels: 16, convs: 2}
+  - {channels: 32, convs: 2}
+dropout: 0.3

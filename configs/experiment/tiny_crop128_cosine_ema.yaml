@@ -1,0 +1,13 @@
+# @package _global_
+# narrow_crop128_cosine_ema with half the channels (2 to 32): only the capacity changes.
+train:
+  experiment: tiny_crop128_cosine_ema
+  weighted_loss: true
+  model: configs/model/tiny_crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
+  lr_schedule: cosine
+  ema_decay: 0.998
+  early_stopping_patience: 40

@@ -188,6 +188,7 @@ python scripts/train.py +experiment=wide_crop128_cosine_ema  # tasa de aprendiza
 python scripts/train.py +experiment=crop128_cosine_ema         # lo anterior con 8-128 canales (≈296.000 parámetros)
 python scripts/train.py +experiment=narrow_crop128_cosine_ema  # lo anterior con 4-64 canales (≈74.000 parámetros)
 python scripts/train.py +experiment=crop128_cosine_ema_decay   # crop128_cosine_ema con decaimiento de pesos 0,5
+python scripts/train.py +experiment=tiny_crop128_cosine_ema    # narrow_crop128_cosine_ema con 2-32 canales (≈19.000 parámetros)
 ```
 
 Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente). Por ejemplo, la batería de entrada, capacidad y optimización (justificación en `documentation/research/pcr_input_and_training.md`):
