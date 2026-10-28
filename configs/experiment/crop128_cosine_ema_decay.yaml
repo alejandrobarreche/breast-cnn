@@ -1,0 +1,16 @@
+# @package _global_
+# crop128_cosine_ema with weight decay 0.5: only the decay changes. AdamW shrinks the weights by
+# learning_rate * weight_decay per step; 1e-4 * 0.5 = 5e-5 matches the usual AdamW setting
+# (learning rate 1e-3, decay 0.05), whereas the default 1e-4 * 1e-4 = 1e-8 is negligible.
+train:
+  experiment: crop128_cosine_ema_decay
+  weighted_loss: true
+  model: configs/model/crop128.yaml
+  rotation_degrees: 15.0
+  max_translation: 0.1
+  scale_range: [0.9, 1.1]
+  learning_rate: 0.0001
+  weight_decay: 0.5
+  lr_schedule: cosine
+  ema_decay: 0.998
+  early_stopping_patience: 40

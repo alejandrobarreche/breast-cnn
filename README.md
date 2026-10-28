@@ -184,6 +184,10 @@ python scripts/train.py +experiment=patient_mean_large_batch  # patient_mean con
 python scripts/train.py +experiment=crop128         # región central de 128 x 128 (recorte dentro del modelo)
 python scripts/train.py +experiment=central_slices  # entrena con los 4 cortes centrales de cada paciente
 python scripts/train.py +experiment=sgd             # SGD con momento 0,9 en lugar de AdamW
+python scripts/train.py +experiment=wide_crop128_cosine_ema  # tasa de aprendizaje coseno y media móvil exponencial de los pesos, 40 épocas
+python scripts/train.py +experiment=crop128_cosine_ema         # lo anterior con 8-128 canales (≈296.000 parámetros)
+python scripts/train.py +experiment=narrow_crop128_cosine_ema  # lo anterior con 4-64 canales (≈74.000 parámetros)
+python scripts/train.py +experiment=crop128_cosine_ema_decay   # crop128_cosine_ema con decaimiento de pesos 0,5
 ```
 
 Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente). Por ejemplo, la batería de entrada, capacidad y optimización (justificación en `documentation/research/pcr_input_and_training.md`):
