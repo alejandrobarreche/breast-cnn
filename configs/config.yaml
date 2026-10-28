@@ -80,21 +80,24 @@ analysis:
   confidence_level: 0.95
   seed: 2026
   # Final image-only model: its fold models are averaged on test after calibration.
-  final_run: runs/20261018-1330_wide_crop128_fixed
+  # It replaced wide_crop128_fixed (runs/20261018-1330_wide_crop128_fixed), whose test
+  # evaluation is kept in the files without the _narrow suffix.
+  final_run: runs/20261028-2002_narrow_crop128_fixed
   # Same protocol with nested: true. The calibration map and the threshold are fitted on its
   # out-of-fold ensemble scores, the same kind of score the final ensemble gives on test.
-  nested_run: runs/20261024-1255_wide_crop128_nested
+  nested_run: runs/20261028-2030_narrow_crop128_fixed_nested
   min_specificity: 0.9
-  calibration_report_path: artifacts/metrics/calibration_validation_patient.json
+  calibration_report_path: artifacts/metrics/calibration_validation_patient_narrow.json
   # Same protocol per slice, for the web application (one slice per prediction).
-  slice_calibration_report_path: artifacts/metrics/calibration_validation_slice.json
+  slice_calibration_report_path: artifacts/metrics/calibration_validation_slice_narrow.json
   # Web application model (outside Git) and its export report with checksum and parity.
   onnx_path: artifacts/models/ensemble.onnx
   onnx_report_path: artifacts/metrics/onnx_export.json
   onnx_parity_slices: 512
   # Single test evaluation (scripts/evaluate_test.py); existing outputs are never overwritten.
-  test_report_path: artifacts/metrics/test_evaluation_patient.json
-  test_predictions_path: artifacts/metrics/predictions_test_slice.csv
-  # Threshold correction made after the test evaluation (scripts/evaluate_test.py --correction):
-  # same test predictions, calibration and threshold from the nested run.
+  test_report_path: artifacts/metrics/test_evaluation_patient_narrow.json
+  test_predictions_path: artifacts/metrics/predictions_test_slice_narrow.csv
+  # Threshold correction made after the test evaluation of wide_crop128_fixed
+  # (scripts/evaluate_test.py --correction): same test predictions, calibration and threshold
+  # from its nested run. Kept as a record; it does not apply to the current final run.
   corrected_test_report_path: artifacts/metrics/test_evaluation_patient_corrected.json

@@ -1,0 +1,81 @@
+{
+  "run": "runs/20261028-2002_narrow_crop128_fixed",
+  "nested_run": "runs/20261028-2030_narrow_crop128_fixed_nested",
+  "unit": "patient",
+  "aggregation": "mean_probability_per_patient",
+  "score": "mean_probability_of_models_without_the_unit_fold",
+  "models_per_unit": 4,
+  "calibration": "platt_on_out_of_fold_ensemble_mean_slope_nonnegative",
+  "min_specificity": 0.9,
+  "platt": {
+    "slope": 0.6407012714813944,
+    "intercept": -0.7786172421388746,
+    "slope_constrained": false
+  },
+  "threshold": 0.35213279993758245,
+  "pooled_validation": {
+    "n": 1097,
+    "positives": 322,
+    "auc": 0.5736605890603086,
+    "sensitivity": 0.14906832298136646,
+    "specificity": 0.9006451612903226,
+    "balanced_accuracy": 0.5248567421358445
+  },
+  "folds": {
+    "0": {
+      "mean_raw_probability": 0.4573236552312334,
+      "mean_calibrated_probability": 0.29347522977364693,
+      "pcr_rate": 0.2922374429223744,
+      "n": 219,
+      "positives": 64,
+      "auc": 0.5755040322580645,
+      "sensitivity": 0.125,
+      "specificity": 0.8903225806451613,
+      "balanced_accuracy": 0.5076612903225807
+    },
+    "1": {
+      "mean_raw_probability": 0.4631401404729921,
+      "mean_calibrated_probability": 0.29610499883272795,
+      "pcr_rate": 0.2831050228310502,
+      "n": 219,
+      "positives": 62,
+      "auc": 0.6047873433326484,
+      "sensitivity": 0.12903225806451613,
+      "specificity": 0.9044585987261147,
+      "balanced_accuracy": 0.5167454283953155
+    },
+    "2": {
+      "mean_raw_probability": 0.46321690970495566,
+      "mean_calibrated_probability": 0.29620241680866466,
+      "pcr_rate": 0.2681818181818182,
+      "n": 220,
+      "positives": 59,
+      "auc": 0.5855353195073165,
+      "sensitivity": 0.13559322033898305,
+      "specificity": 0.9192546583850931,
+      "balanced_accuracy": 0.5274239393620381
+    },
+    "3": {
+      "mean_raw_probability": 0.4517019409338215,
+      "mean_calibrated_probability": 0.29016503378341724,
+      "pcr_rate": 0.3409090909090909,
+      "n": 220,
+      "positives": 75,
+      "auc": 0.5343448275862069,
+      "sensitivity": 0.17333333333333334,
+      "specificity": 0.896551724137931,
+      "balanced_accuracy": 0.5349425287356322
+    },
+    "4": {
+      "mean_raw_probability": 0.45467502330706266,
+      "mean_calibrated_probability": 0.2918982758094716,
+      "pcr_rate": 0.2831050228310502,
+      "n": 219,
+      "positives": 62,
+      "auc": 0.5849599342510786,
+      "sensitivity": 0.1774193548387097,
+      "specificity": 0.89171974522293,
+      "balanced_accuracy": 0.5345695500308199
+    }
+  }
+}

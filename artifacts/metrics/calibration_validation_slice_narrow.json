@@ -1,0 +1,81 @@
+{
+  "run": "runs/20261028-2002_narrow_crop128_fixed",
+  "nested_run": "runs/20261028-2030_narrow_crop128_fixed_nested",
+  "unit": "slice",
+  "aggregation": null,
+  "score": "mean_probability_of_models_without_the_unit_fold",
+  "models_per_unit": 4,
+  "calibration": "platt_on_out_of_fold_ensemble_mean_slope_nonnegative",
+  "min_specificity": 0.9,
+  "platt": {
+    "slope": 0.5646354644445166,
+    "intercept": -0.7878903155522309,
+    "slope_constrained": false
+  },
+  "threshold": 0.3509838595157785,
+  "pooled_validation": {
+    "n": 10945,
+    "positives": 3216,
+    "auc": 0.5683552978412376,
+    "sensitivity": 0.1470771144278607,
+    "specificity": 0.9001164445594514,
+    "balanced_accuracy": 0.523596779493656
+  },
+  "folds": {
+    "0": {
+      "mean_raw_probability": 0.45716650477863596,
+      "mean_calibrated_probability": 0.2937215667367677,
+      "pcr_rate": 0.292772186642269,
+      "n": 2186,
+      "positives": 640,
+      "auc": 0.5706207551746443,
+      "sensitivity": 0.1046875,
+      "specificity": 0.8868046571798189,
+      "balanced_accuracy": 0.4957460785899095
+    },
+    "1": {
+      "mean_raw_probability": 0.4631401404729921,
+      "mean_calibrated_probability": 0.29619738453490796,
+      "pcr_rate": 0.2831050228310502,
+      "n": 2190,
+      "positives": 620,
+      "auc": 0.5923731251284159,
+      "sensitivity": 0.1403225806451613,
+      "specificity": 0.9057324840764331,
+      "balanced_accuracy": 0.5230275323607972
+    },
+    "2": {
+      "mean_raw_probability": 0.46308872630959036,
+      "mean_calibrated_probability": 0.29627527330338205,
+      "pcr_rate": 0.26733576642335766,
+      "n": 2192,
+      "positives": 586,
+      "auc": 0.5808880095546138,
+      "sensitivity": 0.16723549488054607,
+      "specificity": 0.9009962640099627,
+      "balanced_accuracy": 0.5341158794452544
+    },
+    "3": {
+      "mean_raw_probability": 0.4514636182599386,
+      "mean_calibrated_probability": 0.2906287415770793,
+      "pcr_rate": 0.34215328467153283,
+      "n": 2192,
+      "positives": 750,
+      "auc": 0.5350966250577902,
+      "sensitivity": 0.168,
+      "specificity": 0.9063800277392511,
+      "balanced_accuracy": 0.5371900138696255
+    },
+    "4": {
+      "mean_raw_probability": 0.4547409750077899,
+      "mean_calibrated_probability": 0.2924249361675996,
+      "pcr_rate": 0.2837528604118993,
+      "n": 2185,
+      "positives": 620,
+      "auc": 0.578036689683603,
+      "sensitivity": 0.1532258064516129,
+      "specificity": 0.9009584664536742,
+      "balanced_accuracy": 0.5270921364526435
+    }
+  }
+}
