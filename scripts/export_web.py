@@ -14,7 +14,9 @@ changed with respect to the reference experiment, the validation patient AUC of 
 optimistic best epoch), the mean learning curves, and the cohort-only baseline. And writes
 web/src/results.json for the results charts: the nested run's out-of-fold validation patients
 and the test patients (label, raw and calibrated mean probability), the patient threshold, the
-counts of the first test evaluation (before the threshold correction), and the per-fold history of the run whose curves fixed the number of epochs of the final model.
+earlier test evaluation of the previous final model (wide_crop128_fixed, after its threshold
+correction), and the per-fold history of the run whose curves fixed the number of epochs of the
+final model with the epoch each fold would take from the mean curve of the other folds.
 """
 
 import argparse
@@ -52,7 +54,7 @@ OUTPUTS = ("fold_probabilities", "probability", "calibrated", "fold_calibrated")
 EXAMPLES_PER_COHORT = 2
 LAB_REFERENCE = "baseline_weighted"
 # Run whose per-fold curves fixed the number of epochs of the final model
-EPOCH_REFERENCE = "wide_crop128_slow"
+EPOCH_REFERENCE = "narrow_crop128_cosine_ema"
 # Settings that identify a run or the machine, not the experiment
 IGNORED = {"experiment", "model", "folds", "seed", "num_workers", "runs_dir", "threshold", "nested"}
 
@@ -171,16 +173,15 @@ def _results(root: Path, analysis, calibration: dict) -> dict:
         r for r in load_runs(root / analysis.runs_dir) if r.experiment == EPOCH_REFERENCE
     )
     columns = ["train_loss", "validation_loss", "validation_patient_auc"]
-    first = json.loads((root / analysis.test_report_path).read_text("utf-8"))
+    earlier = json.loads((root / analysis.corrected_test_report_path).read_text("utf-8"))
     return {
         "threshold": calibration["threshold"],
-        # First test evaluation, before the post-test threshold correction
-        "first_test": {
-            "threshold": first["threshold"],
-            **{
-                k: first["at_threshold"][k]
-                for k in ("true_positives", "false_negatives", "true_negatives", "false_positives")
-            },
+        # Test evaluation of the previous final model, with its post-test threshold correction
+        "earlier_test": {
+            "run": earlier["run"],
+            "auc": earlier["auc"],
+            "auc_difference": earlier["cohort_baseline"]["auc_difference"],
+            **{k: earlier["at_threshold"][k] for k in ("sensitivity", "specificity")},
         },
         # [fold, label, raw, calibrated] per validation patient; [label, raw, calibrated] in test
         "validation": [
@@ -191,6 +192,7 @@ def _results(root: Path, analysis, calibration: dict) -> dict:
         "epochs": {
             "experiment": EPOCH_REFERENCE,
             "chosen": int(OmegaConf.load(run_dir / "config.yaml").train.epochs),
+            "out_of_fold_epochs": epoch_selection(reference.history)["out_of_fold_epoch"].tolist(),
             "folds": [
                 {"epoch": rows["epoch"].tolist(), **{c: rows[c].round(4).tolist() for c in columns}}
                 for _, rows in reference.history.groupby("fold")
@@ -289,6 +291,8 @@ def main() -> None:
             "optimizer": train["optimizer"],
             "learning_rate": train["learning_rate"],
             "epochs": train["epochs"],
+            "lr_schedule_epochs": train.get("lr_schedule_epochs"),
+            "ema_decay": train.get("ema_decay"),
             "rotation_degrees": train["rotation_degrees"],
             "max_translation": train["max_translation"],
             "scale_range": train["scale_range"],
@@ -300,6 +304,7 @@ def main() -> None:
             "positives": test["positives"],
             "auc": test["auc"],
             "cohort_baseline_auc": test["cohort_baseline"]["auc"],
+            "auc_difference": test["cohort_baseline"]["auc_difference"],
         },
         "split": _split(samples, cohorts, len(load_excluded_patients(root, data.metadata_dir))),
         "examples": examples,

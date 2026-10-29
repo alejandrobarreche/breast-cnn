@@ -20,7 +20,7 @@ describe("layer table", () => {
 
 describe("patient split", () => {
   it("gives the pos_weight that training used on fold 0", () => {
-    // runs/20261018-1330_wide_crop128_fixed/metrics.json, fold 0
+    // runs/20261028-2002_narrow_crop128_fixed/metrics.json, fold 0
     const train = (manifest.split.train as Patient[]).filter((p) => p[0] !== 0);
     expect(positiveWeight(summarize(train))).toBeCloseTo(2.4002329192546585, 12);
   });

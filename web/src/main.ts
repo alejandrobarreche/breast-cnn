@@ -55,7 +55,7 @@ function renderSpec() {
   const sections: [string, [string, string][]][] = [
     ["Validación interna, por corte", [["Cortes", `${thousands(v.n)} (${thousands(v.positives)} pCR)`], ["AUC", comma(v.auc!)], ["Sensibilidad", comma(v.sensitivity!)], ["Especificidad", comma(v.specificity!)], ["Exactitud equilibrada", comma(v.balanced_accuracy!)]]],
     ["Test, por paciente", [["Pacientes", `${s.patients} (${s.positives} pCR)`], ["AUC", comma(s.auc.value)], ["IC 95 % (bootstrap)", `${comma(s.auc.lower)} – ${comma(s.auc.upper)}`], ["Solo cohorte", comma(s.cohort_baseline_auc)]]],
-    ["Entrenamiento", [["Pérdida", t.loss], ["Optimizador", `${t.optimizer === "adamw" ? "AdamW" : t.optimizer}, lr ${String(t.learning_rate).replace(".", ",")}`], ["Épocas", `${t.epochs} fijas`], ["Rotación", `±${t.rotation_degrees}°`], ["Volteo horizontal", `p = ${comma(t.horizontal_flip_probability, 1)}`], ["Dropout", comma(arch.dropout, 1)]]],
+    ["Entrenamiento", [["Pérdida", t.loss], ["Optimizador", `${t.optimizer === "adamw" ? "AdamW" : t.optimizer}, lr ${String(t.learning_rate).replace(".", ",")}`], ["Épocas", `${t.epochs} fijas, coseno de ${t.lr_schedule_epochs}`], ["Media móvil de pesos", comma(t.ema_decay, 3)], ["Rotación", `±${t.rotation_degrees}°`], ["Volteo horizontal", `p = ${comma(t.horizontal_flip_probability, 1)}`], ["Dropout", comma(arch.dropout, 1)]]],
     ["Modelo", [["Formato", "ONNX"], ["Modelos", "5 folds + Platt"], ["Tamaño", `${comma(manifest.model.bytes / 1e6, 1)} MB`], ["Experimento", t.experiment], ["SHA-256", manifest.model.sha256]]],
   ];
   $("spec").replaceChildren(...sections.map(([title, rows]) => {
@@ -65,12 +65,13 @@ function renderSpec() {
     block.append(make("h4", "", title), dl);
     return block;
   }));
+  const d = s.auc_difference;
   $("auc-explain").textContent =
-    `${comma(s.auc.value)}: mejor que el azar, pero no distinguible de la referencia por cohorte (${comma(s.cohort_baseline_auc)}).`;
+    `${comma(s.auc.value)}: no distinguible del azar ni de la referencia por cohorte (${comma(s.cohort_baseline_auc)}).`;
   $("auc-more").textContent =
     `Un AUC de 0,5 equivale a ordenar a las pacientes al azar y 1 a separarlas sin error. ` +
-    `El intervalo de confianza del 95 % (${comma(s.auc.lower)} a ${comma(s.auc.upper)}) no incluye 0,5, pero sí la referencia que solo usa la tasa de pCR de cada cohorte. ` +
-    `La capacidad de discriminación es modesta.`;
+    `El intervalo de confianza del 95 % (${comma(s.auc.lower)} a ${comma(s.auc.upper)}) incluye 0,5 y la referencia que solo usa la tasa de pCR de cada cohorte; ` +
+    `la diferencia con esa referencia es ${comma(d.value)} (IC 95 % ${comma(d.lower)} a ${comma(d.upper)}). Es la segunda evaluación de test: la primera, del modelo anterior, se describe en la clasificación.`;
 }
 
 /* ---------- Results: ROC, probability by class, confusion matrix and number of epochs ---------- */
@@ -87,7 +88,7 @@ function renderResults() {
   ]);
   $("roc-note").textContent =
     `Una curva que siguiera la diagonal ordenaría a las pacientes al azar (AUC 0,5); una que pasara por la esquina superior izquierda las separaría sin error (AUC 1). ` +
-    `Las seis curvas quedan cerca de la diagonal: la capacidad de discriminación es modesta en validación y se mantiene en test.`;
+    `Las seis curvas quedan cerca de la diagonal: la capacidad de discriminación es escasa en validación y en test.`;
 
   const valCal = val.map((p) => p[3]), testCal = test.map((p) => p[2]);
   const byClass = (rows: number[][], label: number, l: number, c: number) => rows.filter((p) => p[l] === label).map((p) => p[c]);
@@ -109,14 +110,15 @@ function renderResults() {
   const valCm = confusion(val.map((p) => p[1]), valCal, R), testCm = confusion(test.map((p) => p[0]), testCal, R);
   $("confusion-lead").textContent = `Con el umbral de ${comma(R, 3)} sobre la probabilidad calibrada por paciente. En validación, cada paciente con la media de los cuatro modelos que no vieron su fold.`;
   renderConfusion($("confusion-validation"), "Validación interna", valCm);
-  renderConfusion($("confusion-test"), "Test con el umbral corregido", testCm);
-  const first = results.first_test;
-  const firstSpecificity = first.true_negatives / (first.true_negatives + first.false_positives);
+  renderConfusion($("confusion-test"), "Test", testCm);
+  const earlier = results.earlier_test;
   const correction: [string, string][] = [
-    ["Corrección posterior al test.", `En la primera evaluación, el umbral (${comma(first.threshold, 3)}) se había elegido sobre la probabilidad de un único modelo y se aplicó a la media de cinco, que tiene menos dispersión. ` +
-      `Ninguna de las ${first.true_positives + first.false_negatives} pacientes con pCR lo alcanzó (especificidad ${comma(firstSpecificity)}).`],
-    ["Cómo se corrigió.", "Se entrenó un modelo por cada par de folds para obtener, en validación, la media de cuatro modelos que no han visto a la paciente. El mapa de Platt y el umbral se ajustaron sobre esa media, sin usar test, y test se volvió a evaluar con las mismas predicciones."],
-    ["Alcance.", "La sensibilidad y la especificidad de test con el umbral corregido se conocieron después de ver la primera evaluación, por lo que no son una estimación independiente. El AUC no cambia: la calibración y el umbral no alteran el orden de las pacientes."],
+    ["Dos evaluaciones de test.", `El primer modelo final, ${earlier.run.split("_").slice(1).join("_")}, obtuvo en test un AUC de ${comma(earlier.auc.value)} (IC 95 % ${comma(earlier.auc.lower)} a ${comma(earlier.auc.upper)}), ` +
+      `${comma(earlier.auc_difference.value)} sobre la referencia por cohorte (IC 95 % ${comma(earlier.auc_difference.lower)} a ${comma(earlier.auc_difference.upper)}). ` +
+      `Su umbral se corrigió después de esa evaluación (sensibilidad ${comma(earlier.sensitivity)}, especificidad ${comma(earlier.specificity)}).`],
+    ["Cambio de modelo.", `Después se sustituyó por ${finalRun.name}, elegido solo con la validación cruzada: AUC fuera de fold de ${comma(mean(finalRun.auc))}, una red con menos parámetros y menor diferencia entre entrenamiento y validación. ` +
+      `Su evaluación es la segunda consulta del mismo test y no puede servir para elegir entre ambos modelos.`],
+    ["Lo que permiten concluir.", "La diferencia entre los dos modelos en test está dentro de la variación esperable con 176 pacientes. Ninguno de los dos se distingue de la referencia que solo conoce la cohorte."],
   ];
   $("confusion-notes").replaceChildren(...correction.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
 }
@@ -146,20 +148,21 @@ function renderEpochs() {
   const peak = meanAuc.indexOf(Math.max(...meanAuc)) + 1, lowest = meanLoss.indexOf(Math.min(...meanLoss)) + 1;
   drawEpochs($("epochs-loss") as unknown as SVGSVGElement, folds, "validation_loss", e.chosen, 0.4, true);
   drawEpochs($("epochs-auc") as unknown as SVGSVGElement, folds, "validation_patient_auc", e.chosen, 0.1);
-  $("epochs-lead").textContent = `${e.experiment} entrenó con parada temprana; el modelo final repite su configuración con ${e.chosen} épocas fijas.`;
+  const chosenBy = e.out_of_fold_epochs.filter((x: number) => x === e.chosen).length;
+  $("epochs-lead").textContent = `${e.experiment} se entrenó ${common} épocas con tasa de aprendizaje en coseno y media móvil exponencial de los pesos; el modelo final repite su configuración y se detiene en la época ${e.chosen}.`;
   const notes: [string, string][] = [
     ["Sobreajuste.", `La pérdida de entrenamiento baja en cada época, mientras que la de validación alcanza su mínimo en la época ${lowest} y después crece: a partir de ahí la red se ajusta a particularidades de las pacientes de entrenamiento que no se generalizan.`],
-    ["Elección.", `La AUC media de los cinco folds es máxima en la época ${peak} (${comma(meanAuc[peak - 1], 3)}). Las medias usan las épocas que alcanzaron todos los folds; la parada temprana corta cada fold en una época distinta.`],
-    ["Alcance.", `El pico es pequeño frente a la variación entre folds, y al reentrenar con ${e.chosen} épocas la AUC media fue ${comma(mean(finalRun.auc), 3)}: el máximo no se reprodujo.`],
+    ["Elección.", `Para cada fold se tomó la época que maximiza la curva media de AUC de los otros cuatro: la época ${e.chosen} en ${chosenBy} de los 5 folds. La curva media de los cinco es máxima en la época ${peak} (${comma(meanAuc[peak - 1], 3)}).`],
+    ["Alcance.", `La curva es casi plana alrededor del máximo, con diferencias menores que la variación entre folds. Al reentrenar con ${e.chosen} épocas, la AUC media fue ${comma(mean(finalRun.auc), 3)}.`],
   ];
   $("epochs-notes").replaceChildren(...notes.map(([title, body]) => { const p = make("p"); p.append(make("b", "", `${title} `), body); return p; }));
 }
 
 function renderLimits() {
   const items = [
-    `Discriminación modesta: AUC ${comma(s.auc.value)} en test (IC 95 % ${comma(s.auc.lower)} a ${comma(s.auc.upper)}).`,
+    `Discriminación escasa: AUC ${comma(s.auc.value)} en test (IC 95 % ${comma(s.auc.lower)} a ${comma(s.auc.upper)}).`,
     `Con el umbral elegido, la mayoría de los casos con pCR se clasifican como «sin pCR» (sensibilidad ${comma(v.sensitivity!, 2)}).`,
-    "El umbral se corrigió después de evaluar test; sus cifras de sensibilidad y especificidad en test no son una estimación independiente.",
+    "El test se consultó dos veces: una con el modelo anterior y otra con el actual, elegido después solo con validación. La segunda cifra no es una estimación del todo independiente.",
     "Un único corte 2D, sin el volumen completo ni datos clínicos.",
     "Cinco muestras comprueban que la aplicación funciona, no su rendimiento.",
     "Uso educativo, sin validez clínica: la pCR solo se confirma con el estudio patológico tras la cirugía, y este valor no justifica ningún cambio de tratamiento.",
@@ -398,9 +401,9 @@ function renderLab() {
       `Elegir en cada fold la época con mayor AUC en ese mismo fold usa la validación para decidir y para medir. En estos experimentos eso añade entre ${comma(Math.min(...optimism), 2)} y ${comma(Math.max(...optimism), 2)} al AUC. ` +
       `Por eso cada fold se lee en la época que maximiza la curva media de los otros cuatro.`],
     ["Modelo final",
-      `${finalRun.name} repite wide_crop128_slow (canales 16 → 256, recorte 128, aumento y tasa 0,0001) con 3 épocas fijas, la época que maximizaba la curva media de los otros folds, y guarda la última. ` +
-      `Al reentrenarlo obtuvo ${comma(mean(finalRun.auc))}: el pico de ${comma(mean(experiments.find((e) => e.name === "wide_crop128_slow")!.auc))} no se reprodujo. ` +
-      `El conjunto de test no intervino en ninguna de estas decisiones.`],
+      `${finalRun.name} repite narrow_crop128_cosine_ema (canales 4 → 64, recorte 128, coseno de 40 épocas y media móvil de los pesos) y se detiene en la época ${results.epochs.chosen}, la que maximizaba la curva media de los otros folds. ` +
+      `Obtuvo ${comma(mean(finalRun.auc))}, frente a ${comma(mean(experiments.find((e) => e.name === "wide_crop128_fixed")!.auc))} del modelo final anterior, wide_crop128_fixed; la diferencia no es significativa. ` +
+      `Se eligió con la validación cruzada, pero después de haber evaluado test con el modelo anterior.`],
   ];
   notes.unshift(["Métrica",
     `AUC por paciente: la probabilidad de que una paciente con pCR reciba una puntuación mayor que una sin pCR. Cada experimento cambia uno o varios factores respecto a la referencia (${runs.reference}). ` +

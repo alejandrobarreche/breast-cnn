@@ -17,7 +17,7 @@ group("experiment lab", () => {
 
   it("marks one final run, read at its last epoch", () => {
     const final = experiments.filter((e) => e.final);
-    expect(final.map((e) => [e.name, e.selection])).toEqual([["wide_crop128_fixed", "last"]]);
-    expect(mean(final[0].auc)).toBeCloseTo(0.559, 3);
+    expect(final.map((e) => [e.name, e.selection])).toEqual([["narrow_crop128_fixed", "last"]]);
+    expect(mean(final[0].auc)).toBeCloseTo(0.582, 3);
   });
 });
