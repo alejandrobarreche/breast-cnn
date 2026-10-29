@@ -11,7 +11,7 @@ Definición del rediseño de `web/`, decidida por capas, de lo estructural a lo 
 | 5 | Sistema visual | Cerrada |
 | 6 | Guía de gráficas | Cerrada |
 | 7 | Componentes | Cerrada |
-| 8 | Implementación | Pendiente |
+| 8 | Implementación | Hecha |
 
 ## 1. Propósito y audiencia
 
@@ -57,8 +57,8 @@ Tres pestañas, una por recorrido de lectura:
 | **El estudio** | Defensa y exploración | Relato en orden: problema y datos, modelo, experimentos, resultados |
 | **Alcance** | Defensa y exploración | Qué permite afirmar el modelo, limitaciones, glosario clínico y técnico |
 
-- La web abre en **Analizar**, con una línea que dice qué es la herramienta y un enlace a **El estudio**.
-- La barra de pestañas está siempre visible.
+- La web abre en **Analizar**, que funciona como un portal de lectura con marco propio: primero la entrada (elegir o cargar un estudio) y, al abrir uno, el espacio de trabajo. El botón «Cómo funciona el modelo» lleva a El estudio.
+- Una barra superior fija está siempre visible: en el portal, la marca y la ruta del estudio abierto; en El estudio y Alcance, las dos pestañas, su índice de secciones y el botón «Analizar un estudio».
 - Cada pestaña tiene su dirección (`#analizar`, `#estudio`, `#alcance`), de modo que el botón «atrás» del navegador funciona y se puede enlazar directamente una pestaña o una sección.
 
 ### Secciones de cada pestaña
@@ -68,7 +68,7 @@ Tres pestañas, una por recorrido de lectura:
 1. Entrada: ejemplos o carga de las tres fases, con las tres imágenes visibles.
 2. Resultado: probabilidad de pCR y clase según el umbral.
 3. Interpretación: curva de captación y mapa de oclusión.
-4. Registro de la defensa: hasta cinco cortes, con etiquetas reveladas a demanda.
+4. Recientes: los estudios leídos en la sesión, con su estimación y la clase real si se reveló; se pueden descargar en CSV.
 
 **El estudio**
 
@@ -292,8 +292,8 @@ Inventario de bloques. Cada bloque indica su tipo (capa 3), lo que muestra, lo q
 
 ### Pendiente de comprobar
 
-- El umbral aparece con dos valores: `manifest.model.threshold` (0,3510) y `results.threshold` (0,3521). Hay que confirmar cuál usa la web y por qué difieren. En la web publicada ya se ven los dos: «35,1 %» en Analizar y «0,352» en Resultados.
-- El texto del mapa de oclusión cita «un AUC de 0,59», que es del modelo anterior y está escrito a mano. Debe salir de `manifest.test_patient.auc`.
+- El umbral tiene dos valores por diseño: `manifest.model.threshold` (0,351) es el umbral por corte, que usa Analizar, y `results.threshold` (0,352) el umbral por paciente, que usan los resultados. Ambos se fijan con especificidad ≥ 0,9 en la validación anidada (`calibrate_and_threshold`, `unit="slice"` o `"patient"`). La web nombra siempre la unidad.
+- El texto del mapa de oclusión toma el AUC de `manifest.test_patient.auc`.
 
 ## 5. Sistema visual
 
@@ -327,7 +327,7 @@ Dirección elegida: **cristal suave**. Paneles translúcidos sobre un fondo clar
 
 ### Tipografía
 
-Una sola familia, **Inter**, en la web y en Matplotlib. Desaparecen IBM Plex Sans y Newsreader. Pesos 400, 500 y 600.
+Una sola familia en la web, **Inter**, cargada desde Google Fonts. Desaparecen IBM Plex Sans y Newsreader. Pesos 400, 500 y 600. Matplotlib sigue con DejaVu Sans (`style.py`), sin instalar nada en las máquinas.
 
 | Tamaño | Peso | Uso |
 |---|---|---|
@@ -339,7 +339,6 @@ Una sola familia, **Inter**, en la web y en Matplotlib. Desaparecen IBM Plex San
 | 14 px | 500 | Rótulos, ejes, leyendas, etiquetas |
 
 - Nada por debajo de 14 px, por el proyector.
-- Matplotlib usa Inter si está instalada en el entorno `ml-cnn` de las dos máquinas; esa instalación la hace el autor (CLAUDE.md). Si falta, usa DejaVu Sans y nada se rompe.
 
 ### Cifras
 
@@ -360,15 +359,15 @@ Una sola familia, **Inter**, en la web y en Matplotlib. Desaparecen IBM Plex San
 
 ### Retícula y espaciado
 
-- **Página**: menú lateral fijo de 260–300 px y contenido; el conjunto ocupa como máximo 1520 px.
-- **Contenido**: 12 columnas con separación de 24 px. En Analizar, visor en 7 y columna de resultado en 5. En un bloque visual de El estudio, gráfica en 8 y texto en 4. En un titular, el título ocupa todo el ancho.
+- **Página**: barra superior fija de 64 px y contenido de 1520 px como máximo; El estudio y Alcance, de 1280 px.
+- **Contenido**: 12 columnas con separación de 24 px. En el portal, lista de estudios de 260 px, visor en el centro e informe de 380 px. En un bloque visual de El estudio, gráfica en 8 y texto en 4. En un titular, el título ocupa todo el ancho.
 - **Espaciado**: 4, 8, 12, 16, 24, 32 y 48 px. Paneles con relleno de 24 px (32 en los bloques visuales de El estudio) y separados 24 px. 4 y 12 solo dentro de componentes pequeños.
 
 ### Navegación
 
-- Menú lateral fijo con, de arriba abajo: la identidad del modelo (hash corto, dispositivo de inferencia, tamaño), las tres pestañas y, en Analizar, los ejemplos y la carga de un corte.
-- Sin logotipo ni nombre de la aplicación en la esquina.
-- Cumple el requisito de la capa 2: la navegación entre pestañas está siempre visible.
+- Barra superior fija con la marca «Lector pCR» a la izquierda. La marca, tres láminas apiladas, indica sin texto si el modelo está disponible: se iluminan con la descarga, quedan sólidas cuando está listo y discontinuas si falla (con el botón «Reintentar»).
+- En el portal, la ruta «Estudios / estudio abierto» y el botón «Cómo funciona el modelo». En El estudio y Alcance, las dos pestañas, el índice de secciones con la visible marcada y el botón «Analizar un estudio».
+- No se muestran el hash del modelo ni detalles de ejecución; el hash está en la ficha del modelo.
 
 ### Estados de interacción
 
@@ -479,13 +478,12 @@ Lista cerrada: la web se construye solo con estas piezas. Tamaños, colores, rad
 
 ### Estructura de página
 
-**Menú lateral.** Fijo, de 260–300 px, sobre un panel de cristal.
+**Barra superior.** Descrita en la capa 5, «Navegación».
 
-- De arriba abajo: identidad del modelo, pestañas y contenido propio de la pestaña.
-- **Identidad del modelo:** hash corto (8 caracteres de `manifest.model.sha256`), dispositivo de inferencia (WebAssembly) y tamaño del fichero, en rótulo de 14 px.
-- **Pestañas:** Analizar, El estudio y Alcance. La activa en estado seleccionado.
-- **En Analizar:** selector de ejemplos y zona de carga.
-- **En El estudio y Alcance:** índice de secciones, con la sección visible marcada al desplazarse. Permite saltar a un bloque durante la defensa.
+**Hoja del portal.** Una sola superficie de cristal para todo Analizar; sus partes se separan con filetes, no con paneles. Dos estados:
+
+- **Entrada:** a la izquierda, las tres fases del primer ejemplo apiladas en perspectiva con un mismo punto y sus intensidades (`slices.ts`); a la derecha, el titular, la lista de estudios y la carga.
+- **Estudio abierto:** lista de estudios (260 px), visor con herramientas y panel de informe (380 px).
 
 **Cabecera de sección.** Número de sección en rótulo de 14 px, título de 40 px y, si hace falta, una línea de cuerpo en texto secundario. Sin panel: va directamente sobre el fondo.
 
@@ -510,11 +508,11 @@ Lista cerrada: la web se construye solo con estas piezas. Tamaños, colores, rad
 - Variantes: principal (fondo en tinta, texto blanco; una sola por pantalla: «Predecir»), secundario (superficie interna) y pequeño (32 px de alto, 14 px; por ejemplo, «Copiar CSV» o «Revelar»).
 - Alto de 40 px, texto de 16 px, radio de 8 px. Solo texto, sin iconos.
 
-**Selector de ejemplos.** Lista vertical en el menú lateral. Cada elemento: miniatura de la fase EARLY sobre el visor (40 px), identificador corto del corte y cohorte. La etiqueta real no aparece. El elemento cargado, en estado seleccionado.
+**Lista de estudios.** Selector «Disponibles / Recientes». Cada fila: miniatura de EARLY, nombre del estudio («Breast_MRI_725 · corte 25») y cohorte; si ya se predijo, su estimación con el punto de su clase. En Recientes, además, cuándo se leyó y la clase real si se reveló, con «Descargar» (CSV) y «Borrar». El estudio abierto, en estado seleccionado.
 
-**Zona de carga.** Tres huecos rotulados PRE, EARLY y LATE que aceptan arrastrar o elegir ficheros. Cada hueco muestra si está vacío, cargado (con el nombre del fichero) o con error (con el motivo).
+**Carga de un estudio.** Zona discontinua que abre el selector de ficheros; también se puede soltar los tres PNG en cualquier punto de la página. Cada fichero se asigna a su fase por el sufijo; los errores aparecen en una nota.
 
-**Deslizador.** Solo para la opacidad del mapa de oclusión. Pista de 4 px y tirador de 16 px en tinta.
+**Herramientas del visor.** «Medir captación» y «Recorte» se activan y desactivan; «Realce» y «Oclusión» se alternan en la cuarta imagen. Activar la oclusión calcula el mapa, con su progreso.
 
 **Enlace.** Texto en tinta, subrayado de 1 px. Se usa para los saltos entre pestañas (por ejemplo, de A3 a Alcance › Qué significa la probabilidad).
 
@@ -545,3 +543,28 @@ No hay color de error: el rojo se confundiría con el coral de pCR. Un error se 
 ### Lo que no se usa
 
 Ventanas modales, desplegables, pestañas dentro de un bloque, definiciones al pasar el cursor, notificaciones emergentes, formas de píldora, iconos decorativos y logotipo.
+
+## 8. Implementación
+
+### Organización del código
+
+- `web/index.html`: barra superior, el portal de Analizar y los contenedores de El estudio y Alcance.
+- `web/src/main.ts`: navegación entre pestañas (`#pestaña/sección`), el portal (entrada, estudio abierto, herramientas, Recientes) y la carga y verificación del modelo.
+- `web/src/slices.ts`: las fases apiladas de la entrada del portal.
+- `web/src/study.ts` y `web/src/scope.ts`: El estudio y Alcance, construidos la primera vez que se abren.
+- `web/src/page.ts`: componentes de bloque (cabecera de sección, bloque visual, titular), entrada animada de paneles e índice de secciones.
+- Gráficas: `ruler.ts` (A3), `uptake.ts` (A4), `clinic.ts` (E2, E3), `split.ts` (E5, E6), `network.ts` (E9), `ensemble.ts` (E11), `lab.ts` (E12), `results.ts` (E13, E16, E17), `auc.ts` (E15). Toda gráfica se dibuja como máximo a escala 1:1, para que sus rótulos no bajen de 14 px.
+
+### Diferencias con las capas 4 a 7
+
+- **A3**: el modelo ONNX no exporta el logit; el detalle muestra la probabilidad sin calibrar y el rango de los cinco modelos.
+- **A5**: el mapa de oclusión es la cuarta imagen del visor, no un bloque aparte, y no tiene deslizador de opacidad.
+- **Registro de la defensa (A6)**: pasa a ser «Recientes» en la lista de estudios.
+- **E3**: las cuatro imágenes en fila y el esquema de curvas debajo.
+- **E9**: bloque a todo el ancho y sin la parte final de los cinco modelos, que explica E11; a ocho columnas, sus rótulos quedaban por debajo de 14 px.
+- **E12**: sin la marca de la mejor época del propio fold; aparece en la tabla al seleccionar un experimento.
+- **E13**: solo el AUC; la pérdida se cita en el detalle.
+
+### Pendiente
+
+- Proyectar la web en el aula (capa 5, comprobación en proyector).

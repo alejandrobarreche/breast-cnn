@@ -1,35 +1,51 @@
-// Fig. 4: test AUC per patient with its 95 % bootstrap interval, against chance (0.5) and the
-// cohort-only reference, on a 0.4-0.8 scale.
-import { el, text, token } from "./svg";
+// E15: test AUC per patient with its 95 % bootstrap interval for the current and the earlier
+// final model, against chance (0.5) and the cohort-only reference on a 0.4-0.8 scale; below,
+// on its own axis centred on zero, each model's difference with that reference.
+import { decimal, draw, el, fade, grow, text, token } from "./svg";
 
-const X0 = 24, X1 = 536, LO = 0.4, HI = 0.8;
-const comma = (x: number) => x.toFixed(3).replace(".", ",");
+export interface Interval { label: string; value: number; lower: number; upper: number; primary: boolean }
 
-export function drawAuc(svg: SVGSVGElement, value: number, lower: number, upper: number, baseline: number) {
-  svg.replaceChildren();
-  const x = (v: number) => X0 + ((v - LO) / (HI - LO)) * (X1 - X0);
-  const AXIS = 150, MODEL = 62, REF = 112;
+const L = 150, R = 490, ROW = 56;
 
-  // Axis with ticks every 0.05
-  el("line", { x1: X0, y1: AXIS, x2: X1, y2: AXIS, stroke: token("--t3") }, svg);
-  for (let k = 0; k <= 8; k++) {
-    const v = LO + k * 0.05, major = k % 2 === 0;
-    el("line", { x1: x(v), y1: AXIS, x2: x(v), y2: AXIS + (major ? 8 : 5), stroke: major ? token("--muted") : token("--t3") }, svg);
-    if (major) text(svg, x(v), AXIS + 28, v.toFixed(1).replace(".", ","), { "text-anchor": "middle", "font-size": 14 });
+function rows(svg: SVGSVGElement, items: Interval[], top: number, lo: number, hi: number, delay: number) {
+  const x = (v: number) => L + ((v - lo) / (hi - lo)) * (R - L);
+  const ink = token("--ink");
+  items.forEach((item, i) => {
+    const cy = top + i * ROW + ROW / 2;
+    text(svg, 0, cy + 5, item.label, { fill: item.primary ? ink : token("--ink-2"), "font-size": 16, "font-weight": item.primary ? 600 : 500 });
+    el("rect", { x: x(item.lower), y: cy - 12, width: x(item.upper) - x(item.lower), height: 24, rx: 6, fill: ink, opacity: item.primary ? 0.85 : 0.35, ...grow(delay + i * 150) }, svg);
+    el("line", { x1: x(item.value), y1: cy - 12, x2: x(item.value), y2: cy + 12, stroke: "#fff", "stroke-width": 3, ...fade(delay + 500 + i * 150) }, svg);
+    text(svg, R + 20, cy + 5, `${decimal(item.value)}  [${decimal(item.lower)}; ${decimal(item.upper)}]`, { fill: item.primary ? ink : token("--ink-2"), "font-size": 16, ...fade(delay + 600 + i * 150) });
+  });
+  return x;
+}
+
+function axis(svg: SVGSVGElement, x: (v: number) => number, y: number, ticks: number[], digits: number) {
+  el("line", { x1: L, y1: y, x2: R, y2: y, stroke: token("--axis") }, svg);
+  for (const v of ticks) {
+    el("line", { x1: x(v), y1: y, x2: x(v), y2: y + 6, stroke: token("--axis") }, svg);
+    text(svg, x(v), y + 24, decimal(v, digits), { "text-anchor": "middle" });
   }
+}
 
-  // Chance
-  el("line", { x1: x(0.5), y1: 22, x2: x(0.5), y2: AXIS, stroke: token("--t4"), "stroke-dasharray": "3 4" }, svg);
-  text(svg, x(0.5) - 8, 30, "azar", { "text-anchor": "end", "font-size": 13 });
+export function drawAuc(svg: SVGSVGElement, models: Interval[], baseline: number, differences: Interval[]) {
+  svg.replaceChildren();
+  const ink = token("--ink"), ref = token("--ref");
+  const TOP = 36, bottom = TOP + models.length * ROW;
+  const x = rows(svg, models, TOP, 0.4, 0.8, 300);
+  for (let k = 0; k <= 8; k++) el("line", { x1: x(0.4 + k * 0.05), y1: TOP, x2: x(0.4 + k * 0.05), y2: bottom, stroke: token("--grid") }, svg);
+  axis(svg, x, bottom, [0.4, 0.5, 0.6, 0.7, 0.8], 1);
+  el("line", { x1: x(0.5), y1: TOP - 14, x2: x(0.5), y2: bottom, stroke: ink, "stroke-width": 2, "stroke-dasharray": "5 5", ...fade(0) }, svg);
+  text(svg, x(0.5) - 6, TOP - 18, "azar 0,5", { "text-anchor": "end", fill: ink });
+  el("line", { x1: x(baseline), y1: TOP - 14, x2: x(baseline), y2: bottom, stroke: ref, "stroke-width": 3, "stroke-dasharray": "6 6", ...fade(100) }, svg);
+  text(svg, x(baseline) + 6, TOP - 18, `referencia por cohorte ${decimal(baseline)}`);
 
-  // Model: interval and point
-  el("line", { x1: x(lower), y1: MODEL, x2: x(upper), y2: MODEL, stroke: token("--ink"), "stroke-width": 3, "stroke-linecap": "round" }, svg);
-  for (const v of [lower, upper]) el("line", { x1: x(v), y1: MODEL - 8, x2: x(v), y2: MODEL + 8, stroke: token("--ink"), "stroke-width": 2 }, svg);
-  el("circle", { cx: x(value), cy: MODEL, r: 7, fill: token("--lit"), stroke: token("--bench"), "stroke-width": 2 }, svg);
-  text(svg, x(value), MODEL - 18, `modelo ${comma(value)}`, { "text-anchor": "middle", "font-size": 14, fill: token("--ink") });
-  text(svg, x(upper) + 12, MODEL + 5, "IC 95 %", { "font-size": 13 });
-
-  // Cohort-only reference
-  el("path", { d: `M${x(baseline)} ${REF - 7} l7 7 l-7 7 l-7 -7 z`, fill: token("--muted") }, svg);
-  text(svg, x(baseline) + 14, REF + 5, `solo cohorte ${comma(baseline)}`, { "font-size": 14 });
+  // Differences with the cohort-only reference
+  const DTOP = bottom + 92, span = 0.15;
+  text(svg, 0, DTOP - 20, "Diferencia con la referencia por cohorte", { fill: ink, "font-size": 16, "font-weight": 600 });
+  const dx = rows(svg, differences, DTOP, -span, span, 900);
+  const dbottom = DTOP + differences.length * ROW;
+  axis(svg, dx, dbottom, [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15], 2);
+  el("line", { x1: dx(0), y1: DTOP - 4, x2: dx(0), y2: dbottom, stroke: ink, "stroke-width": 2, ...draw(800, 600) }, svg);
+  svg.setAttribute("viewBox", `0 0 ${R + 220} ${dbottom + 36}`);
 }

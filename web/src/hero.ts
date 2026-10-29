@@ -4,7 +4,7 @@
 // react to the pointer; afterwards a few more pulses cross the network and the drawing stops on
 // its final frame. With reduced motion only that frame is drawn. It pauses while off screen or
 // in a hidden tab.
-import { percent, thousands } from "./svg";
+import { decimal, thousands } from "./svg";
 
 export interface HeroInput {
   phases: HTMLCanvasElement[]; // PRE, EARLY, LATE
@@ -184,7 +184,7 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(c.x, c.y, c.s, c.s);
     ctx.restore();
-    if (u >= 1) text(`${input.crop} × ${input.crop}`, c.x + 6, c.y + 16, 12, 0.85);
+    if (u >= 1) text(`${input.crop} × ${input.crop}`, c.x + 6, c.y + 18, 14, 0.85);
   }
 
   function drawSheet(c: Column, k: number, light: number, image?: HTMLCanvasElement) {
@@ -253,7 +253,7 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
     });
     if (outputSeen) {
       const out = columns[columns.length - 1];
-      text(`${percent(input.probability)} %`, out.x + 8, out.cy - 26, 22, 0.95, "center");
+      text(decimal(input.probability, 2), out.x + 8, out.cy - 26, 22, 0.95, "center");
     }
     ctx.globalAlpha = 1;
   }
@@ -294,12 +294,12 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
       : t < T_CROP ? "Llegada del contraste: diferencia EARLY − PRE"
       : t < T_NET ? `Recorte central de ${f} × ${f} píxeles que recibe la red`
       : !outputSeen ? `Cinco etapas convolucionales, ${thousands(input.params)} parámetros por modelo`
-      : `Media calibrada de ${input.models} modelos: probabilidad de pCR del ${percent(input.probability)} %`;
+      : `Media calibrada de ${input.models} modelos: probabilidad de pCR ${decimal(input.probability, 2)}`;
     text(line, img.x, img.y + img.s + 32, 14, 0.82);
-    text(input.sampleId, img.x + 8, img.y + 18, 12, 0.7);
-    text(`${input.cohort}, test`, img.x + img.s - 8, img.y + 18, 12, 0.7, "right");
+    text(input.sampleId, img.x + 8, img.y + 20, 14, 0.7);
+    text(`${input.cohort}, test`, img.x + img.s - 8, img.y + 20, 14, 0.7, "right");
     const phase = t < T_WAVE ? "PRE" : t < T_CROP ? "EARLY − PRE" : "Realce sobre PRE";
-    text(phase, img.x + 8, img.y + img.s - 10, 12, 0.7);
+    text(phase, img.x + 8, img.y + img.s - 10, 14, 0.7);
   }
 
   let start = 0, clock = 0, last = 0, frame = 0, visible = true;
@@ -334,7 +334,7 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
   }
 
   layout();
-  new ResizeObserver(() => { layout(); if (!frame) draw(performance.now()); }).observe(canvas);
+  new ResizeObserver(() => { if (!canvas.clientWidth) return; layout(); if (!frame) draw(performance.now()); }).observe(canvas);
   new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting && !document.hidden;
     if (visible && !frame && !finished) { last = performance.now(); frame = requestAnimationFrame(draw); }
