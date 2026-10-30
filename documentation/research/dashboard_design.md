@@ -2,7 +2,7 @@
 
 ## Pregunta
 
-Qué debe contener la aplicación web del proyecto (sección 9 y 12 del enunciado) y qué información sobre el modelo conviene mostrar, de forma que la demostración sea útil sin exagerar lo que el modelo puede afirmar (AUC en test 0,591 [0,508; 0,673]).
+Qué debe contener la aplicación web del proyecto (sección 9 y 12 del enunciado) y qué información sobre el modelo conviene mostrar, de forma que la demostración sea útil sin exagerar lo que el modelo puede afirmar (AUC en test del modelo final 0,522 [0,442; 0,603]).
 
 ## Fuentes
 
@@ -26,7 +26,7 @@ Qué debe contener la aplicación web del proyecto (sección 9 y 12 del enunciad
 - **Ficha del modelo.** Mitchell et al. y Sendak et al. proponen documentar en una sola página el uso previsto, los usos fuera de alcance, los datos de entrenamiento, las métricas por subgrupo y las limitaciones. TRIPOD+AI pide además informar sobre la calibración, el umbral y el rendimiento por subgrupo.
 - **Utilidad clínica.** Las curvas de decisión comparan el beneficio neto del modelo con las estrategias de tratar a todas o a ninguna. Encajan con la comparación frente a «siempre sin pCR» que ya está en el informe de test.
 - **Datos de otra procedencia.** Con imágenes ajenas a la distribución de entrenamiento, los modelos médicos dan predicciones poco razonables sin avisar. Un indicador visible de desplazamiento cambió cómo los usuarios confiaban en las predicciones (Park et al.).
-- **Mapas de saliencia.** Grad-CAM y métodos afines localizan peor que los expertos y, en algunos estudios, no superan las pruebas de aleatorización. Con un AUC de 0,59, un mapa de calor sugeriría una explicación que el modelo no respalda.
+- **Mapas de saliencia.** Grad-CAM y métodos afines localizan peor que los expertos y, en algunos estudios, no superan las pruebas de aleatorización. Con un AUC de 0,52, un mapa de calor sugeriría una explicación que el modelo no respalda.
 
 ## Conclusión
 
