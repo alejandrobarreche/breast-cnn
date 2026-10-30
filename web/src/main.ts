@@ -96,7 +96,7 @@ function markState(kind: "loading" | "ready" | "error", fraction = 0) {
 $("retry").addEventListener("click", () => location.reload());
 
 /* ---------- Viewer: four views with a shared measuring point ---------- */
-interface Cell { canvas: HTMLCanvasElement; label: HTMLElement; note: HTMLElement; read: HTMLElement; cross: HTMLElement }
+interface Cell { node: HTMLElement; canvas: HTMLCanvasElement; label: HTMLElement; note: HTMLElement; read: HTMLElement; cross: HTMLElement }
 const viewsNode = $("views");
 const cells: Cell[] = VIEWS.map(([name, note]) => {
   const cell = make("div", "cell");
@@ -106,12 +106,27 @@ const cells: Cell[] = VIEWS.map(([name, note]) => {
   const frame = make("div", "crop-frame");
   frame.style.inset = `${((1 - CROP / SIZE) / 2) * 100}%`;
   const label = make("span", "chip-label", name), noteNode = make("span", "chip-note", note), read = make("span", "chip-read");
-  cell.append(canvas, frame, cross, label, noteNode, read);
+  const back = make("button", "cell-back", "Cuatro vistas");
+  back.addEventListener("click", (event) => { event.stopPropagation(); enlarge(null); });
+  cell.style.viewTransitionName = `view-${name.toLowerCase()}`;
+  cell.append(canvas, frame, cross, label, noteNode, read, back);
   viewsNode.append(cell);
-  return { canvas, label, note: noteNode, read, cross };
+  return { node: cell, canvas, label, note: noteNode, read, cross };
 });
 const uptake = drawUptake($("uptake") as unknown as SVGSVGElement);
-const ruler = drawRuler($("ruler") as unknown as SVGSVGElement, THRESHOLD, manifest.model.train_pcr_rate, manifest.architecture.models);
+const ruler = drawRuler($("ruler") as unknown as SVGSVGElement, THRESHOLD);
+
+// One view at the size of the whole viewer, or the four; the change morphs where the browser
+// supports view transitions
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function enlarge(node: HTMLElement | null) {
+  const apply = () => {
+    viewsNode.classList.toggle("solo", node != null);
+    cells.forEach((cell) => cell.node.classList.toggle("big", cell.node === node));
+  };
+  if (reducedMotion || !document.startViewTransition) apply();
+  else document.startViewTransition(apply);
+}
 
 // Brightest 5 x 5 enhancement inside the central crop: the starting point of the curve
 function strongestEnhancement(pre: Uint8ClampedArray, early: Uint8ClampedArray) {
@@ -124,14 +139,11 @@ function strongestEnhancement(pre: Uint8ClampedArray, early: Uint8ClampedArray) 
     }
   return best;
 }
-const cropMean = (pixels: Uint8ClampedArray) => windowMean(pixels, SIZE, SIZE / 2, SIZE / 2, CROP / 2 - 1);
 
 /* ---------- Occlusion map: the fourth view when its tool is on ---------- */
 // One inference at a time on the session: Predict waits while the map is computed
 let occlusionRun = 0, occluding = false;
 let occlusionMap: OcclusionMap | null = null;
-const OCCLUSION_NOTE = `Muestra qué cambia la salida de este modelo, no dónde está el tumor. ` +
-  `Con un AUC por paciente en test de ${decimal(testAuc.value)}, el mapa puede reflejar sobre todo ruido.`;
 
 function drawFourth() {
   const cell = cells[3], ctx = cell.canvas.getContext("2d")!, k = cell.canvas.width / SIZE;
@@ -157,14 +169,24 @@ function drawFourth() {
   }
 }
 
+// Legend of the fourth view in the report: the colour ramp of ENHANCEMENT_CMAP with what each
+// end means, and for the occlusion map its numbers in one line
+$("view-ramp").style.background = `linear-gradient(90deg, ${[-1, -0.5, 0, 0.5, 1].map((v) => `rgb(${enhancementColour(v).join(", ")})`).join(", ")})`;
 function viewDetail() {
-  const detail = $("view-detail");
-  if (state.fourth === "enhancement") {
-    detail.textContent = "Realce: EARLY − PRE sobre la fase PRE. Coral donde el tejido gana contraste, verde petróleo donde lo pierde.";
+  const occlusionView = state.fourth === "occlusion";
+  $("view-title").textContent = occlusionView ? "Mapa de oclusión" : "Mapa de realce";
+  $("ramp-lo").textContent = occlusionView ? "hacia no pCR" : "pierde contraste";
+  $("ramp-hi").textContent = occlusionView ? "hacia pCR" : "gana contraste";
+  const tag = $("view-tag"), detail = $("view-detail");
+  tag.hidden = !(occlusionView && occlusionMap);
+  if (!occlusionView) {
+    tag.hidden = false;
+    tag.textContent = "EARLY − PRE";
+    detail.textContent = "";
   } else if (occlusionMap) {
     const top = Math.max(...Array.from(occlusionMap.deltas, Math.abs));
-    detail.textContent = `Oclusión: cada parche de 16 × 16 píxeles del recorte se tapa con ceros. Coral: taparlo baja la probabilidad, así que empuja hacia pCR; verde petróleo, al contrario. ` +
-      `Probabilidad sin tapar ${decimal(occlusionMap.base, 2)}; mayor cambio ${decimal(top, 3)}. ${OCCLUSION_NOTE}`;
+    tag.textContent = `sin tapar ${decimal(occlusionMap.base, 2)}`;
+    detail.textContent = `Parches de 16 px tapados con ceros; mayor cambio ${decimal(top, 3)}. Indica qué usa el modelo, no dónde está el tumor.`;
   } else detail.textContent = "";
 }
 
@@ -225,18 +247,21 @@ function drawProbe() {
   viewsNode.classList.toggle("pinned", state.pinned);
   if (!probe || !pixels) {
     cells.forEach((cell) => (cell.read.textContent = ""));
-    uptake.set(null, null);
+    uptake.set(null);
+    $("uptake-pattern").hidden = true;
     $("probe-context").textContent = "";
-    $("uptake-text").textContent = pixels ? "Activa «Medir captación» y pasa el cursor por la imagen." : "";
+    $("uptake-text").textContent = pixels ? "Activa «Medir captación»." : "";
     return;
   }
   const values = pixels.map((p) => windowMean(p, SIZE, probe.x, probe.y));
   cells.forEach((cell, i) => (cell.read.textContent = i < 3 ? decimal(values[i], 2) : state.fourth === "enhancement" ? `${values[1] - values[0] >= 0 ? "+" : "−"}${decimal(Math.abs(values[1] - values[0]), 2)}` : ""));
-  uptake.set(values, pixels.map(cropMean));
+  uptake.set(values);
   const { pattern, delayed } = kinetics(values[0], values[1], values[2]);
-  $("uptake-text").textContent = pattern === "sin realce"
-    ? `Sin realce apreciable: EARLY supera a PRE en menos de ${decimal(MIN_ENHANCEMENT, 2)}.`
-    : `${pattern[0].toUpperCase()}${pattern.slice(1)}: en LATE, ${delayed >= 0 ? "+" : "−"}${percent(Math.abs(delayed))} % frente a EARLY.`;
+  const tag = $("uptake-pattern");
+  tag.hidden = false;
+  tag.textContent = pattern === "sin realce" ? pattern : `${pattern} ${delayed >= 0 ? "+" : "−"}${percent(Math.abs(delayed))} %`;
+  tag.title = pattern === "sin realce" ? `EARLY supera a PRE en menos de ${decimal(MIN_ENHANCEMENT, 2)}` : "Cambio de LATE frente a EARLY";
+  $("uptake-text").textContent = "";
   $("probe-context").textContent = state.pinned ? "Punto fijado" : probe === state.auto ? "Punto de mayor realce" : "Punto bajo el cursor";
 }
 
@@ -250,13 +275,17 @@ viewsNode.addEventListener("pointermove", (event) => {
   state.probe = pointAt(event);
   drawProbe();
 });
+// While measuring, a click fixes the point; otherwise it enlarges the view
 viewsNode.addEventListener("click", (event) => {
-  if (!state.measuring || !state.pixels || !(event.target as HTMLElement).closest(".cell")) return;
+  const cell = (event.target as HTMLElement).closest<HTMLElement>(".cell");
+  if (!cell || !state.pixels) return;
+  if (!state.measuring) { if (!viewsNode.classList.contains("solo")) enlarge(cell); return; }
   state.pinned = !state.pinned;
   state.probe = pointAt(event as PointerEvent);
   drawProbe();
 });
 viewsNode.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && viewsNode.classList.contains("solo")) { enlarge(null); return; }
   const moves: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   const move = moves[event.key];
   if (!move || !state.probe || !state.measuring) return;
@@ -274,6 +303,7 @@ $("tool-probe").addEventListener("click", () => {
   state.measuring = !state.measuring;
   if (state.measuring) { state.probe = state.auto; state.pinned = false; }
   toggle("tool-probe", state.measuring);
+  viewsNode.classList.toggle("measuring", state.measuring);
   drawProbe();
 });
 $("tool-crop").addEventListener("click", () => toggle("tool-crop", !viewsNode.classList.toggle("no-crop")));
@@ -281,25 +311,47 @@ $("tool-enhancement").addEventListener("click", () => setFourth("enhancement"));
 $("tool-occlusion").addEventListener("click", () => setFourth("occlusion"));
 
 /* ---------- Result ---------- */
-function classTag(node: HTMLElement, positive: boolean, note: string) {
+function classTag(node: HTMLElement, positive: boolean) {
   node.hidden = false;
   node.className = `class-tag ${positive ? "pos" : "neg"}`;
-  node.replaceChildren(make("i"), positive ? "pCR" : "no pCR", ...(note ? [make("small", "", note)] : []));
+  node.replaceChildren(make("i"), positive ? "pCR" : "no pCR");
 }
 function showResult(prediction: Prediction | null) {
-  ruler.set(prediction?.foldCalibrated ?? null, prediction?.calibrated ?? null, true);
+  ruler.set(prediction?.calibrated ?? null, true);
   const prob = $("prob");
-  $("real-tag").hidden = true;
   if (!prediction) {
-    prob.className = "figure-big idle";
-    prob.textContent = state.modelError ? "Modelo no disponible" : "Pulsa Predecir";
+    prob.className = state.modelError ? "figure-big idle error" : "figure-big idle";
+    prob.textContent = state.modelError ? "Modelo no disponible" : "—";
     $("class-tag").hidden = true;
     return;
   }
-  const positive = prediction.calibrated >= THRESHOLD;
   prob.className = "figure-big";
   countUp(prob, prediction.calibrated, (v) => decimal(v, 2));
-  classTag($("class-tag"), positive, "");
+  classTag($("class-tag"), prediction.calibrated >= THRESHOLD);
+}
+
+// Real class of the open study: the reveal button until it is revealed, then the class and
+// whether the estimate agrees with it; studies loaded from file have no class
+const revealButton = $("reveal") as HTMLButtonElement;
+function showReal(entry: Entry | undefined, read: boolean) {
+  const slot = $("real-slot");
+  if (state.example == null) {
+    slot.dataset.shows = "";
+    slot.replaceChildren(make("span", "report-muted", "Sin clase real: estudio cargado desde archivo"));
+    return;
+  }
+  if (!read || entry!.label == null) {
+    revealButton.disabled = !read;
+    slot.dataset.shows = "";
+    if (!slot.contains(revealButton)) slot.replaceChildren(revealButton);
+    return;
+  }
+  // Rebuilt only when it changes, so that its entrance plays once
+  if (slot.dataset.shows === entry!.sampleId) return;
+  slot.dataset.shows = entry!.sampleId;
+  const tag = make("span");
+  classTag(tag, entry!.label === 1);
+  slot.replaceChildren(make("span", "report-muted", "real"), tag, make("span", "report-muted", (entry!.label === 1) === entry!.positive ? "acierto" : "fallo"));
 }
 
 function updateButtons() {
@@ -308,11 +360,11 @@ function updateButtons() {
   $("action-hint").textContent =
     !state.model ? (state.modelError ? "El modelo no se ha podido cargar; pulsa Reintentar en la barra superior." : "Predecir se activa cuando el modelo esté preparado.")
     : occluding ? "Predecir espera a que termine el mapa de oclusión."
-    : !read ? ""
-    : state.example == null ? "Los estudios cargados desde archivo no tienen clase real que revelar."
-    : entry!.label != null ? "Clase real revelada; está en Recientes." : "";
-  ($("predict") as HTMLButtonElement).disabled = !(state.model && state.pixels) || occluding;
-  ($("reveal") as HTMLButtonElement).disabled = !read || state.example == null || entry!.label != null;
+    : "";
+  const predictButton = $("predict") as HTMLButtonElement;
+  predictButton.disabled = !(state.model && state.pixels) || occluding;
+  predictButton.classList.toggle("primary", !read);
+  showReal(entry, read);
   const occlusionTool = $("tool-occlusion") as HTMLButtonElement;
   occlusionTool.disabled = !state.model;
   occlusionTool.title = state.model ? "" : "Disponible cuando el modelo esté preparado";
@@ -498,8 +550,6 @@ async function predict(record = true) {
   showResult(prediction);
   state.lastPredicted = state.sampleId;
   if (!record) {
-    const label = state.log.find((e) => e.sampleId === state.sampleId)?.label;
-    if (label != null) classTag($("real-tag"), label === 1, (label === 1) === prediction.calibrated >= THRESHOLD ? "real · acierto" : "real · fallo");
     updateButtons();
     return;
   }
@@ -508,16 +558,14 @@ async function predict(record = true) {
   const index = state.log.findIndex((e) => e.sampleId === entry.sampleId);
   if (index >= 0) entry.label = state.log.splice(index, 1)[0].label;
   state.log.push(entry);
-  if (entry.label != null) classTag($("real-tag"), entry.label === 1, (entry.label === 1) === entry.positive ? "real · acierto" : "real · fallo");
   renderLists();
   updateButtons();
 }
 $("predict").addEventListener("click", () => predict());
-$("reveal").addEventListener("click", () => {
+revealButton.addEventListener("click", () => {
   const entry = state.log.find((e) => e.sampleId === state.sampleId);
   if (!state.example || !entry) return;
   entry.label = state.example.label;
-  classTag($("real-tag"), entry.label === 1, (entry.label === 1) === entry.positive ? "real · acierto" : "real · fallo");
   renderLists();
   updateButtons();
 });
@@ -541,7 +589,7 @@ addEventListener("drop", (e) => {
 $("entry-art").addEventListener("click", () => openFromList(manifest.examples[0]));
 $("entry-art").setAttribute("aria-label", `Abrir ${studyName(manifest.examples[0].sample_id)}`);
 const note = $("auc-note");
-note.append(`AUC por paciente en test ${decimal(testAuc.value)}: la estimación apenas separa las clases. `);
+note.append(`AUC en test ${decimal(testAuc.value)}, próximo al azar. `);
 const link = make("a", "", "Qué significa");
 link.href = "#alcance/probabilidad";
 note.append(link);
