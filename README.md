@@ -24,16 +24,22 @@ El proyecto utiliza una **CNN 2D desarrollada específicamente para este trabajo
 
 Cada arquitectura se describe en un fichero YAML dentro de `configs/`, de modo que puede leerse y modificarse sin tocar el código que la construye.
 
-La arquitectura definitiva se determinará durante la fase experimental. Una vez fijada, su composición se documentará en la siguiente tabla:
+La arquitectura final es `configs/model/narrow_crop128.yaml`: cinco bloques convolucionales de 4 a 64 canales sobre la región central de 128 × 128 píxeles, con **74.253 parámetros**. Cada bloque aplica dos veces convolución 3 × 3 (sin sesgo), normalización por lotes y ReLU, seguidas de un *max pooling* 2 × 2. Las tres fases entran juntas como canales de la primera convolución (fusión temprana).
 
 | Capa / bloque | Operación | Kernel | Stride | Padding | Canales | Volumen de salida | Activación | Parámetros |
 |---|---|---:|---:|---:|---:|---|---|---:|
 | INPUT | — | — | — | — | 3 | 3 × 256 × 256 | — | — |
-| — | — | — | — | — | — | — | — | — |
-| — | — | — | — | — | — | — | — | — |
-| — | — | — | — | — | — | — | — | — |
-| — | — | — | — | — | — | — | — | — |
-| OUTPUT | — | — | — | — | — | — | — | — |
+| Recorte | Región central | — | — | — | 3 | 3 × 128 × 128 | — | 0 |
+| Bloque 1 | 2 × (Conv + BN) + MaxPool | 3 / 2 | 1 / 2 | 1 / 0 | 4 | 4 × 64 × 64 | ReLU | 268 |
+| Bloque 2 | 2 × (Conv + BN) + MaxPool | 3 / 2 | 1 / 2 | 1 / 0 | 8 | 8 × 32 × 32 | ReLU | 896 |
+| Bloque 3 | 2 × (Conv + BN) + MaxPool | 3 / 2 | 1 / 2 | 1 / 0 | 16 | 16 × 16 × 16 | ReLU | 3.520 |
+| Bloque 4 | 2 × (Conv + BN) + MaxPool | 3 / 2 | 1 / 2 | 1 / 0 | 32 | 32 × 8 × 8 | ReLU | 13.952 |
+| Bloque 5 | 2 × (Conv + BN) + MaxPool | 3 / 2 | 1 / 2 | 1 / 0 | 64 | 64 × 4 × 4 | ReLU | 55.552 |
+| Cabeza | Media global + Dropout 0,3 + Lineal | — | — | — | 64 | 1 | — | 65 |
+| OUTPUT | Logit de pCR del corte | — | — | — | 1 | 1 | — | — |
+| **Total** | | | | | | | | **74.253** |
+
+En las columnas de kernel, stride y padding, el primer valor corresponde a las convoluciones y el segundo al *max pooling*. La tabla completa por capa se obtiene con `python scripts/describe_model.py configs/model/narrow_crop128.yaml`.
 
 ---
 
@@ -135,9 +141,63 @@ P(pCR | paciente) = -------------------------
                                  n
 ```
 
-La media es el punto de partida. Si se prueba otra agregación (por ejemplo, ponderar o descartar cortes), la elección se hará con la validación interna de `train`, nunca con `test`.
+Se probaron alternativas durante el entrenamiento (pérdida por paciente con media o máximo de logits, solo cortes centrales) y ninguna mejoró de forma consistente la validación interna, por lo que la solución final mantiene la media.
 
 La evaluación final del modelo se realiza a nivel de paciente.
+
+---
+
+## Solución final
+
+### Protocolo de entrenamiento
+
+Experimento `configs/experiment/narrow_crop128_fixed.yaml`, entrenado con validación cruzada de 5 `fold` por paciente:
+
+- Pérdida `BCEWithLogitsLoss` ponderada con `pos_weight = N0 / N1` (entre 2,33 y 2,55 según el fold), calculado en el subconjunto de entrenamiento de cada fold.
+- AdamW, tasa de aprendizaje inicial 1e-4 con decaimiento coseno planificado para 40 épocas, decaimiento de pesos 1e-4 y lotes de 32 cortes.
+- Media móvil exponencial de los pesos (EMA, 0,998): el modelo guardado es el promedio suavizado de los pesos.
+- Aumento geométrico idéntico en las tres fases y solo en entrenamiento: volteo horizontal (p = 0,5), rotación ±15°, traslación ±10 % y escala 0,9–1,1.
+- Número de épocas fijo: 8, y se conserva la última. Las 8 épocas se eligieron en `narrow_crop128_cosine_ema` (40 épocas) tomando, para cada fold, la época que maximiza la curva media de validación de los otros cuatro; así el fold evaluado no interviene en la elección de su propia época.
+
+### Selección del modelo
+
+Se entrenaron 28 experimentos de validación cruzada, más 2 runs anidados de calibración (`runs/`, análisis en `notebooks/02_runs_analysis.ipynb`). Los únicos factores con efecto repetido fueron el recorte central de 128 × 128, que concentra la entrada en la región mamaria, y la reducción de capacidad: con 74.253 parámetros la diferencia entre el AUC de train y el de validación baja a 0,057, frente a 0,157 del modelo ancho (`wide_crop128_fixed`). Un modelo aún menor (2–32 canales, ≈ 19.000 parámetros) obtuvo AUC 0,534, compatible con falta de capacidad.
+
+### Calibración y umbral
+
+El modelo final es el **ensemble de los 5 modelos de fold**: la probabilidad de una paciente es la media de las probabilidades de sus cortes, promediada entre los 5 modelos.
+
+El mapa de calibración (Platt, pendiente 0,641) y el umbral se ajustan con un run anidado (`narrow_crop128_fixed_nested`, un modelo por pareja de folds). Cada paciente de `train` recibe la media de los cuatro modelos que no vieron su fold, el mismo tipo de puntuación que el ensemble produce en `test`. El umbral, **0,352** por paciente, es el que garantiza especificidad ≥ 90 % en esa validación.
+
+### Resultados en validación interna
+
+| Medida (paciente, 1.097 pacientes) | Valor |
+|---|---:|
+| AUC por fold, media ± desviación | 0,582 ± 0,034 |
+| AUC del ensemble fuera de fold (run anidado) | 0,574 |
+| Sensibilidad / especificidad en el umbral 0,352 | 0,149 / 0,901 |
+| Referencia: AUC usando solo la cohorte de origen | 0,549 |
+
+La referencia por cohorte asigna a cada paciente la tasa de pCR de su cohorte en entrenamiento. Sirve para comprobar si la red aporta algo más que reconocer de qué hospital procede la imagen.
+
+### Resultados en test
+
+`test` (176 pacientes, 53 pCR) se evaluó dos veces, y ambas evaluaciones se presentan:
+
+| | Modelo ancho (1.ª evaluación) | Modelo final estrecho (2.ª evaluación) |
+|---|---:|---:|
+| AUC por paciente [IC 95 %] | 0,591 [0,508; 0,673] | 0,522 [0,442; 0,603] |
+| Diferencia con la referencia por cohorte (0,544) | +0,047 [−0,036; 0,129] | −0,022 [−0,102; 0,059] |
+| Sensibilidad / especificidad en el umbral | 0,226 / 0,886 ¹ | 0,094 / 0,927 |
+| Verdaderos / falsos positivos | 12 / 14 ¹ | 5 / 9 |
+
+¹ Umbral corregido después de ver `test`: el original se había ajustado sobre puntuaciones de un solo modelo y, aplicado al ensemble, daba sensibilidad 0. El AUC no depende del umbral.
+
+El cambio al modelo estrecho se decidió únicamente con la validación interna, antes de su evaluación en `test`; el resultado de `test` no se ha usado para volver al modelo ancho. Los intervalos se obtienen con 10.000 remuestreos *bootstrap*.
+
+### Conclusión
+
+Ninguno de los dos modelos supera de forma significativa a la referencia que solo usa la cohorte: los intervalos de confianza de la diferencia incluyen el 0. Con esta CNN 2D entrenada desde cero y solo con la imagen, la señal de respuesta al tratamiento que se detecta es débil (AUC entre 0,52 y 0,59) y, en parte, atribuible a diferencias entre cohortes. El modelo no es apto para un uso clínico.
 
 ---
 
@@ -208,10 +268,10 @@ python scripts/train.py --resume runs/<id>
 Calibración y umbral del ensemble final. El run anidado entrena un modelo por cada par de folds con el protocolo final. Cada paciente recibe la media de los cuatro modelos que no vieron su fold, que es el mismo tipo de puntuación que da el ensemble en test. Sobre esa puntuación se ajustan el mapa de Platt y el umbral (`analysis.nested_run` en `configs/config.yaml`):
 
 ```bash
-python scripts/train.py +experiment=wide_crop128_nested
+python scripts/train.py +experiment=narrow_crop128_fixed_nested
 python scripts/fit_calibration.py                 # por paciente (evaluación en test)
 python scripts/fit_calibration.py --unit slice    # por corte (aplicación web)
-python scripts/evaluate_test.py --correction      # reevalúa test con el umbral corregido
+python scripts/evaluate_test.py                   # evaluación final en test
 ```
 
 Tests y estilo:
@@ -230,7 +290,7 @@ cd web && npm install && npm test   # incluye la paridad con las salidas de Pyth
 npm run dev                         # http://localhost:5173
 ```
 
-Se publica en <https://alejandrobarreche.github.io/breast-cnn/> con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v2` y comprueba su SHA-256 contra `web/src/manifest.json`.
+Se publica en <https://alejandrobarreche.github.io/breast-cnn/> con `.github/workflows/pages.yml` en cada push a `main` que toque `web/`. El modelo no está en Git: el workflow lo descarga de la Release `model-v3` y comprueba su SHA-256 contra `web/src/manifest.json`.
 
 ---
 
