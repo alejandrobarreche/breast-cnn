@@ -112,33 +112,47 @@
                 </div>
                 <div class="progress" id="occlusion-progress" hidden><span id="occlusion-status"></span><div class="bar-track"><i id="occlusion-bar"></i></div></div>
                 <span id="probe-context"></span>
-                <p class="detail" id="view-detail"></p>
               </div>
               <div class="viewer">
-                <div class="views" id="views" tabindex="0" aria-label="Fases PRE, EARLY y LATE y cuarta vista. Las flechas mueven el punto de medida."></div>
+                <div class="views measuring" id="views" tabindex="0" aria-label="Fases PRE, EARLY y LATE y cuarta vista. Con «Medir captación» activa, pulsar fija el punto y las flechas lo mueven; sin ella, pulsar amplía la vista y Escape vuelve a las cuatro."></div>
               </div>
             </div>
 
             <aside class="report" aria-labelledby="report-label">
-              <div aria-live="polite">
+              <section class="report-estimate" aria-live="polite">
                 <span class="figure-label" id="report-label">Probabilidad de pCR del corte</span>
                 <div class="report-figure">
-                  <span class="figure-big idle" id="prob">Pulsa Predecir</span>
+                  <span class="figure-big idle" id="prob">—</span>
                   <span class="class-tag" id="class-tag" hidden></span>
                 </div>
-                <span class="class-tag" id="real-tag" hidden></span>
+              </section>
+              <div class="report-scale">
+                <svg class="chart" id="ruler" role="img" aria-label="Escala de 0 a 0,6 con la probabilidad del corte y el umbral"></svg>
               </div>
-              <svg class="chart" id="ruler" role="img" aria-label="Escala de 0 a 0,6 con la probabilidad del corte, el umbral, la proporción de pCR en entrenamiento y los cinco modelos"></svg>
-              <div class="actions">
+              <div class="report-actions">
                 <button class="btn primary" id="predict" disabled>Predecir</button>
-                <button class="btn" id="reveal" disabled>Revelar la clase real</button>
+                <span class="real-slot" id="real-slot" aria-live="polite">
+                  <button class="btn" id="reveal" disabled>Revelar clase real</button>
+                </span>
               </div>
-              <p class="context" id="action-hint" aria-live="polite"></p>
-              <p class="note" id="auc-note"></p>
+              <p class="report-hint" id="action-hint" aria-live="polite"></p>
+              <p class="report-foot" id="auc-note"></p>
               <div class="report-sec">
-                <h3 class="card-title">Captación en el punto</h3>
-                <p class="detail" id="uptake-text"></p>
-                <svg class="chart" id="uptake" role="img" aria-label="Intensidad del punto seleccionado en las fases PRE, EARLY y LATE frente a la media del recorte central"></svg>
+                <div class="report-sec-head">
+                  <h3 class="card-title">Captación en el punto</h3>
+                  <span class="pattern-tag" id="uptake-pattern" hidden></span>
+                </div>
+                <svg class="chart" id="uptake" role="img" aria-label="Intensidad del punto seleccionado en las fases PRE, EARLY y LATE"></svg>
+                <p class="report-hint" id="uptake-text"></p>
+              </div>
+              <div class="report-sec">
+                <div class="report-sec-head">
+                  <h3 class="card-title" id="view-title"></h3>
+                  <span class="pattern-tag" id="view-tag" hidden></span>
+                </div>
+                <div class="ramp" id="view-ramp" aria-hidden="true"></div>
+                <div class="ramp-labels"><span id="ramp-lo"></span><span id="ramp-hi"></span></div>
+                <p class="report-hint" id="view-detail"></p>
               </div>
             </aside>
           </div>

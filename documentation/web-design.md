@@ -127,24 +127,25 @@ Inventario de bloques. Cada bloque indica su tipo (capa 3), lo que muestra, lo q
 
 - Visual: las tres fases en escala de grises, con rótulos PRE, EARLY y LATE, y el mapa de realce `EARLY − PRE`. Selector de ejemplos y carga de tres PNG.
 - Rótulos: qué es cada fase en una línea (antes del contraste, poco después, minutos después).
+- Con «Medir captación» desactivada, pulsar una vista la amplía a todo el visor; «Cuatro vistas» o Escape vuelve a la cuadrícula. Con la medida activa, pulsar fija el punto.
 - Fuente: `manifest.examples` (corte, cohorte y ficheros; la etiqueta queda oculta hasta revelarla).
 
 **A3. Resultado** · Herramienta
 
-- Visual: escala de probabilidad 0–1 con la estimación, el umbral y la prevalencia de pCR en entrenamiento como referencia. Clase resultante con su color.
+- Visual: barra fina de 0 a 0,6 dividida por el umbral en los tramos no pCR y pCR, con sus colores de clase, y la marca de la estimación; el tramo donde cae se intensifica. Clase resultante con su color.
+- Debajo, «Predecir» y, en la misma fila, «Revelar clase real», que se sustituye por la clase real y si coincide.
 - Rótulo: una línea que recuerda que el AUC en test es próximo al azar, con enlace a Alcance › Qué significa la probabilidad.
-- Detalle: logit, probabilidad sin calibrar, probabilidad de cada uno de los cinco modelos de fold.
-- Fuente: navegador (salidas `fold_probabilities`, `probability`, `calibrated`, `fold_calibrated`); `manifest.model.threshold`, `min_specificity`, `train_pcr_rate`; `manifest.test_patient.auc`.
+- Fuente: navegador (salida `calibrated`); `manifest.model.threshold`; `manifest.test_patient.auc`.
 
 **A4. Curva de captación** · Herramienta
 
-- Visual: intensidad en PRE, EARLY y LATE del punto seleccionado frente a la media del recorte central, con el tipo de curva rotulado sobre el gráfico (persistente, meseta, lavado).
+- Visual: intensidad en PRE, EARLY y LATE del punto seleccionado, con el área bajo la curva sombreada. El tipo de curva (persistente, meseta, lavado o sin realce) y el cambio de LATE frente a EARLY van en una etiqueta junto al título; los valores de cada fase, sobre las imágenes.
 - Fuente: navegador (ventana de 5 × 5 píxeles; regla de ±10 % en LATE).
 
 **A5. Mapa de oclusión** · Herramienta
 
 - Visual: mapa superpuesto al corte; color según cuánto cambia la probabilidad al tapar cada región, con la escala rotulada.
-- Detalle: tamaño de parche y valor de relleno (cero).
+- Leyenda en el panel del informe, junto a la de realce: escala de color con «hacia no pCR» y «hacia pCR», probabilidad sin tapar y una línea con el tamaño de parche, el relleno (cero) y el mayor cambio.
 - Fuente: navegador.
 
 **A6. Registro de la defensa** · Herramienta

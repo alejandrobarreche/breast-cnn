@@ -219,11 +219,38 @@ body:has(#files:focus-visible) .upload { outline: 2px solid var(--ink); outline-
 .tool-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
 .tool-btn:disabled { opacity: 0.4; cursor: default; }
 .tool-sep { height: 1px; background: var(--line); margin: 4px 0; }
-.report { border-left: 1px solid var(--line); padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+/* Report: estimate, scale, actions and the AUC note together; uptake below, after a line. Secondary text at 14 px so that the figure and the charts lead. */
+.report { border-left: 1px solid var(--line); padding: 16px 24px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
 .report > * { flex: none; }
-.report-figure { display: flex; align-items: center; gap: 14px; margin: 8px 0; flex-wrap: wrap; }
-.report-sec { border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 6px; }
-.report .detail { margin: 0; }
+.report-estimate { display: grid; gap: 4px; }
+.report-figure { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.report .figure-big { font-size: 44px; }
+.report .figure-big.idle { color: var(--axis); }
+.report .figure-big.idle.error { font-size: 19px; color: var(--ink-2); }
+.report-scale { display: grid; gap: 4px; padding: 4px 0 2px; }
+.report-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.report-actions .btn { height: 36px; padding: 0 14px; font-size: 15px; }
+.real-slot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 36px; }
+.real-slot .btn { width: 100%; }
+.real-slot .report-muted:only-child { text-align: right; }
+.report-hint { font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+.report-hint:empty { display: none; }
+.report-muted { font-size: 14px; color: var(--ink-2); line-height: 1.3; }
+/* The uptake section takes the free height of the panel and its chart fills it (uptake.ts) */
+.report-sec { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 6px; display: grid; gap: 10px; }
+.report-sec-head { display: flex; align-items: center; white-space: nowrap; justify-content: space-between; gap: 8px; min-width: 0; }
+.pattern-tag { font-size: 14px; font-weight: 600; white-space: nowrap; padding: 2px 8px; border-radius: 6px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.ramp { height: 8px; border-radius: 4px; }
+.ramp-labels { display: flex; justify-content: space-between; font-size: 14px; color: var(--ink-2); }
+.report-foot { font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+.report-foot a { color: var(--ink); }
+/* Scale regions: faint until the estimate falls in one of them */
+#ruler .zone { opacity: 0.22; transition: opacity 400ms var(--ease); }
+#ruler .zone.on { opacity: 0.75; }
+/* The predicted and the revealed class arrive after the figure has counted up */
+#class-tag:not([hidden]), .real-slot .class-tag { animation: tag-in 320ms var(--ease) both; }
+#class-tag:not([hidden]) { animation-delay: 600ms; }
+@keyframes tag-in { from { opacity: 0; transform: translateY(4px) scale(0.96); } }
 
 /* ---------- Text blocks ---------- */
 /* Section titles start on the same vertical line as the content of the panels (32 px) */
@@ -305,6 +332,15 @@ body:has(#files:focus-visible) .upload { outline: 2px solid var(--ink); outline-
 .cross::after { top: var(--y); left: calc(var(--x) - 10px); height: 1.5px; width: 20px; transform: translateY(-50%); }
 .views.pinned .cross::before, .views.pinned .cross::after { background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
 .views.no-crop .crop-frame { display: none; }
+/* One view enlarged to the whole viewer: a click on a view opens it, «Cuatro vistas» or Escape closes it */
+.views:not(.measuring):not(.solo) .cell { cursor: zoom-in; }
+.views:not(.measuring).solo .cell { cursor: default; }
+.stage .views.solo { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.views.solo .cell:not(.big) { display: none; }
+.cell-back { position: absolute; bottom: 8px; left: 8px; display: none; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--viewer-chip); color: #fff; font: 500 14px var(--font); cursor: pointer; transition: background-color 150ms var(--ease); }
+.cell-back:hover { background: rgba(255, 255, 255, 0.24); }
+.cell.big .cell-back { display: block; }
+::view-transition-group(*) { animation-duration: 320ms; animation-timing-function: var(--ease); }
 .viewer-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 14px; }
 .viewer-single { position: relative; aspect-ratio: 1; width: min(100%, 400px); margin: 0 auto; border-radius: 8px; overflow: hidden; }
 .viewer-single canvas { width: 100%; height: 100%; }
@@ -378,7 +414,7 @@ body:has(#files:focus-visible) .upload { outline: 2px solid var(--ink); outline-
 .lab-hit { fill: transparent; transition: fill 150ms var(--ease); }
 .lab-row:hover .lab-hit { fill: rgba(255, 255, 255, 0.7); }
 .lab-row.on .lab-hit { fill: #fff; }
-.stage { cursor: pointer; }
+g.stage { cursor: pointer; }
 .stage rect.face { transition: fill 150ms var(--ease); }
 .stage:hover rect.face { fill: #f4f5f6; }
 .stage.on rect.face { fill: var(--ink); }
@@ -405,6 +441,7 @@ body:has(#files:focus-visible) .upload { outline: 2px solid var(--ink); outline-
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .panel.reveal, .reveal .draw, .reveal .grow, .reveal .fade { opacity: 1; transform: none; stroke-dashoffset: 0; transition: none !important; }
-  .btn, .study-row, .tool-btn, .doc-tab { transition: none; }
+  .btn, .study-row, .tool-btn, .doc-tab, #ruler .zone { transition: none; }
+  #class-tag, .real-slot .class-tag { animation: none !important; }
   .slice-layer, .slice-probe { transform: none; opacity: 1; transition: none; }
 }
