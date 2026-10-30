@@ -129,23 +129,7 @@ metadata/
 
 ## Predicción por paciente
 
-La CNN genera inicialmente una probabilidad de pCR para cada corte:
-
-```text
-corte 1 -> 0.21
-corte 2 -> 0.27
-corte 3 -> 0.35
-...
-corte n -> 0.29
-```
-
-Como la pCR es una propiedad de la paciente, las probabilidades de todos sus cortes se agregan mediante la media:
-
-```text
-                        p1 + p2 + ... + pn
-P(pCR | paciente) = -------------------------
-                                 n
-```
+La CNN genera una probabilidad de pCR para cada corte. Como la pCR es una propiedad de la paciente, la probabilidad de una paciente es la media de las probabilidades de sus cortes.
 
 Se probaron alternativas durante el entrenamiento (pérdida por paciente con media o máximo de logits, solo cortes centrales) y ninguna mejoró de forma consistente la validación interna, por lo que la solución final mantiene la media.
 
@@ -234,35 +218,16 @@ Arquitectura:
 python scripts/describe_model.py configs/model/baseline.yaml   # tabla de capas y parámetros
 ```
 
-Entrenamiento (validación cruzada con los 5 `fold` de `train`; un experimento por fichero de `configs/experiment/`):
+Entrenamiento con validación cruzada de los 5 `fold` de `train`. Cada fichero de `configs/experiment/` define un experimento; los 30 runs ejecutados están en `runs/`. El modelo final se entrena con:
 
 ```bash
-python scripts/train.py +experiment=baseline_unweighted
-python scripts/train.py +experiment=baseline_weighted
-python scripts/train.py +experiment=augmented     # aumento geométrico conjunto
-python scripts/train.py +experiment=regularized   # tasa de aprendizaje 3e-4, decaimiento 1e-2
-python scripts/train.py +experiment=separable     # convoluciones separables en profundidad
-python scripts/train.py +experiment=augmented_slow  # aumento geométrico y tasa de aprendizaje 1e-4
-python scripts/train.py +experiment=patient_mean    # pérdida por paciente: media de logits de sus cortes
-python scripts/train.py +experiment=patient_max     # pérdida por paciente: máximo de logits de sus cortes
-python scripts/train.py +experiment=label_smoothing # objetivos 0,05 / 0,95
-python scripts/train.py +experiment=patient_mean_large_batch  # patient_mean con 12 pacientes por lote
-python scripts/train.py +experiment=crop128         # región central de 128 x 128 (recorte dentro del modelo)
-python scripts/train.py +experiment=central_slices  # entrena con los 4 cortes centrales de cada paciente
-python scripts/train.py +experiment=sgd             # SGD con momento 0,9 en lugar de AdamW
-python scripts/train.py +experiment=wide_crop128_cosine_ema  # tasa de aprendizaje coseno y media móvil exponencial de los pesos, 40 épocas
-python scripts/train.py +experiment=crop128_cosine_ema         # lo anterior con 8-128 canales (≈296.000 parámetros)
-python scripts/train.py +experiment=narrow_crop128_cosine_ema  # lo anterior con 4-64 canales (≈74.000 parámetros)
-python scripts/train.py +experiment=crop128_cosine_ema_decay   # crop128_cosine_ema con decaimiento de pesos 0,5
-python scripts/train.py +experiment=tiny_crop128_cosine_ema    # narrow_crop128_cosine_ema con 2-32 canales (≈19.000 parámetros)
-python scripts/train.py +experiment=narrow_crop128_fixed       # narrow_crop128_cosine_ema detenido en la época 8 de su coseno de 40
-python scripts/train.py +experiment=narrow_crop128_fixed_nested  # lo anterior con un modelo por pareja de folds (umbral del ensemble)
+python scripts/train.py +experiment=narrow_crop128_fixed
 ```
 
-Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente). Por ejemplo, la batería de entrada, capacidad y optimización (justificación en `documentation/research/pcr_input_and_training.md`):
+Varios experimentos seguidos con un solo comando (si uno falla, se informa y continúa el siguiente):
 
 ```bash
-python scripts/train.py --experiments crop128 crop160 pool2 central_slices wide deep sgd crop128_slow crop128_central_slow pool2_slow wide_slow wide_crop128_slow
+python scripts/train.py --experiments crop128 wide deep
 ```
 
 Cada época imprime la pérdida y el AUC por paciente de train y validación. Si un entrenamiento se interrumpe, se continúa desde la última época completada:
@@ -285,6 +250,7 @@ Tests y estilo:
 ```bash
 python -m pytest
 python -m ruff check .
+python -m ruff format --check .
 ```
 
 Aplicación web (`web/`, Vite + TypeScript; el modelo se ejecuta en el navegador con ONNX Runtime Web):
