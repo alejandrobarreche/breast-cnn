@@ -6,6 +6,12 @@ Este repositorio contiene el desarrollo de un proyecto académico de Deep Learni
 
 La red genera una probabilidad de pCR para cada corte. Posteriormente, las predicciones de los cortes pertenecientes a una misma paciente se agregan para obtener una predicción a nivel de paciente.
 
+<p>
+  <a href="https://alejandrobarreche.github.io/breast-cnn/"><img src="https://img.shields.io/badge/Aplicaci%C3%B3n_web-Lector_pCR-15191D?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Aplicación web Lector pCR"></a>
+  <a href="https://huggingface.co/alejandrobarreche/lector-pcr"><img src="https://img.shields.io/badge/Hugging_Face-lector--pcr-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Modelo en Hugging Face"></a>
+  <a href="documentation/presentacion.pdf"><img src="https://img.shields.io/badge/Presentaci%C3%B3n-PDF-4A525B?style=for-the-badge&logo=googleslides&logoColor=white" alt="Presentación en PDF"></a>
+</p>
+
 **Aplicación web:** <https://alejandrobarreche.github.io/breast-cnn/>. El modelo se ejecuta en el navegador; uso educativo, sin validez clínica.
 
 ---
