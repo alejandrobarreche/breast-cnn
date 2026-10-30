@@ -55,7 +55,8 @@ const X0 = 260, X1 = 650, LO = 0.4, HI = 0.7, ROW = 28, TOP = 48;
 const x = (v: number) => X0 + ((Math.max(LO, Math.min(HI, v)) - LO) / (HI - LO)) * (X1 - X0);
 
 /** E12 dot plot: one row per experiment sorted by mean AUC, a small grey dot per fold, the mean
- * (in ink for the final model), the reference run, the cohort-only band and chance. */
+ * (in ink for the final model) with ± one standard deviation, the reference run, the cohort-only
+ * band with its mean, and chance. */
 export function drawLab(svg: SVGSVGElement, experiments: Experiment[], reference: string, cohort: number[], onSelect: (name: string) => void, onHover: (name: string | null) => void) {
   svg.replaceChildren();
   const ink = token("--ink"), ref = token("--ref");
@@ -64,6 +65,7 @@ export function drawLab(svg: SVGSVGElement, experiments: Experiment[], reference
   const c = mean(cohort), s = std(cohort);
   // References share one baseline above the plot and start where the rows start
   el("rect", { x: x(c - s), y: TOP - 8, width: x(c + s) - x(c - s), height: bottom - TOP + 8, fill: ref, "fill-opacity": 0.16, ...fade(0) }, svg);
+  el("line", { x1: x(c), y1: TOP - 8, x2: x(c), y2: bottom, stroke: ref, "stroke-width": 2, ...fade(0) }, svg);
   text(svg, x(c + s) + 8, TOP - 18, `referencia por cohorte ${decimal(c)} ± ${decimal(s)}`);
   for (let v = LO; v <= HI + 1e-9; v += 0.05) {
     el("line", { x1: x(v), y1: TOP - 8, x2: x(v), y2: bottom, stroke: token("--grid") }, svg);
@@ -80,6 +82,9 @@ export function drawLab(svg: SVGSVGElement, experiments: Experiment[], reference
     el("rect", { class: "lab-hit", x: 0, y: y - ROW / 2 + 1, width: X1 + 70, height: ROW - 2, rx: 6 }, g);
     text(g, 10, y + 5, e.name + (e.name === reference ? " (referencia)" : ""), { class: "lab-name", fill: e.final ? ink : token("--ink-2"), "font-weight": e.final ? 600 : 500 });
     const inner = el("g", fade(300 + i * 25), g);
+    // Spread between folds: mean ± one standard deviation
+    const m = mean(e.auc), sd = std(e.auc);
+    el("line", { x1: x(m - sd), y1: y, x2: x(m + sd), y2: y, stroke: e.final ? ink : token("--ink-2"), "stroke-width": 2, "stroke-linecap": "round", opacity: 0.5 }, inner);
     for (const v of e.auc) el("circle", { cx: x(v), cy: y, r: 3, fill: ref, opacity: 0.7 }, inner);
     el("circle", { cx: x(mean(e.auc)), cy: y, r: e.final ? 7 : 5.5, fill: e.final ? ink : token("--ink-2"), stroke: "#fff", "stroke-width": 1.5 }, inner);
     text(inner, X1 + 16, y + 5, decimal(mean(e.auc)), { fill: e.final ? ink : token("--ink-2"), "font-weight": e.final ? 600 : 500 });

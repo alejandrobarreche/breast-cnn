@@ -1,6 +1,6 @@
-// E15: test AUC per patient with its 95 % bootstrap interval for the current and the earlier
-// final model, against chance (0.5) and the cohort-only reference on a 0.4-0.8 scale; below,
-// on its own axis centred on zero, each model's difference with that reference.
+// E15: test AUC per patient with its 95 % bootstrap interval, against chance (0.5) and the
+// cohort-only reference on a 0.4-0.8 scale; below, on its own axis centred on zero, the
+// difference with that reference.
 import { decimal, draw, el, fade, grow, text, token } from "./svg";
 
 export interface Interval { label: string; value: number; lower: number; upper: number; primary: boolean }

@@ -234,18 +234,12 @@ Inventario de bloques. Cada bloque indica su tipo (capa 3), lo que muestra, lo q
 - Conclusión: cómo se eligió el número de épocas sin usar test.
 - Fuente: `results.epochs`.
 
-**E14. Dos evaluaciones en test** · Titular
-
-- Título: El test se evaluó dos veces.
-- Texto: qué modelo se evaluó cada vez, por qué hubo una segunda evaluación y qué implica para la lectura de E15.
-- Fuente: `results.earlier_test`, `manifest.test_patient`.
-
 **E15. AUC por paciente en test** · Visual
 
-- Visual: AUC con intervalo de confianza del modelo actual, del modelo anterior y de la referencia por cohorte, en un mismo eje con el azar (0,5) marcado.
+- Visual: AUC con intervalo de confianza del modelo final y de la referencia por cohorte, en un mismo eje con el azar (0,5) marcado.
 - Conclusión: a redactar con los datos; debe decir si el modelo supera a la referencia por cohorte.
-- Detalle: número de pacientes, método del intervalo, diferencia con la referencia y su probabilidad.
-- Fuente: `manifest.test_patient`, `results.earlier_test`.
+- Detalle: número de pacientes, método del intervalo, diferencia con la referencia y que el test ya se había consultado antes con otro modelo candidato.
+- Fuente: `manifest.test_patient`.
 
 **E16. Curvas ROC por paciente** · Visual
 
@@ -322,7 +316,7 @@ Dirección elegida: **cristal suave**. Paneles translúcidos sobre un fondo clar
 | No pCR | `#23656E` | Fijo (capa 1) |
 | pCR | `#DC7867` | Fijo (capa 1) |
 
-- **Sin color de acento.** La miel `#E2B55E` desaparece; la acción es negra.
+- **Sin color de acento.** La acción es negra. La miel `#E2B55E` solo queda en la señal que recorre la red en la animación de apertura de «El estudio», sobre el visor oscuro.
 - **Los colores de clase forman también la escala de realce** (`ENHANCEMENT_CMAP`: verde petróleo pierde contraste, coral gana). Por eso el mapa de realce lleva siempre su propia leyenda.
 
 ### Tipografía

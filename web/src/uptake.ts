@@ -49,12 +49,15 @@ export function drawUptake(svg: SVGSVGElement) {
       svg.style.opacity = point ? "1" : "0.35";
       reference.setAttribute("points", mean ? points(mean) : "");
       referenceLabel.setAttribute("x", String(X[1]));
-      referenceLabel.setAttribute("y", String(mean ? y(mean[1]) + (point && point[1] < mean[1] ? -14 : 24) : -20));
+      referenceLabel.setAttribute("y", String(mean ? y(mean[1]) + (point && point[1] < mean[1] ? -14 : 24) : 0));
+      // Hidden rather than moved off the drawing: the chart does not clip what lies outside
+      referenceLabel.setAttribute("visibility", mean ? "visible" : "hidden");
       referenceLabel.setAttribute("text-anchor", "middle");
       curve.setAttribute("points", point ? points(point) : "");
       dots.forEach((dot, k) => {
         dot.setAttribute("cx", String(X[k]));
-        dot.setAttribute("cy", String(point ? y(point[k]) : -20));
+        dot.setAttribute("cy", String(point ? y(point[k]) : 0));
+        dot.setAttribute("visibility", point ? "visible" : "hidden");
       });
       if (!point) {
         band.setAttribute("points", "");

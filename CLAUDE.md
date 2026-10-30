@@ -81,7 +81,7 @@ El usuario no tiene formación médica. Los conceptos clínicos (pCR, DCE-MRI, r
 - El título nombra el contenido según la sección 5. El subtítulo indica split, unidad (`corte` o `paciente`), clase positiva y umbral cuando corresponda.
 - Matplotlib. Las funciones de dibujo viven en `src/breast_cnn/visualization/` y separan el cálculo de los datos del dibujo.
 - Salida en PNG con nombres en `snake_case` que incluyen split y unidad, por ejemplo `roc_validation_patient.png`. Las figuras de análisis van a `artifacts/figures/`; las de un entrenamiento, a la carpeta de su run (sección 12).
-- La aplicación web usa el tema «cristal suave» de `documentation/web-design.md` (capas 5 a 7): paneles translúcidos sobre fondo claro, imágenes médicas siempre sobre el visor oscuro, solo Inter, acción en negro `#15191D` y sin color de acento. Sus tokens están en `web/src/style.css`; los colores de clase y la escala de realce son los de `style.py`.
+- La aplicación web usa el tema «cristal suave» de `documentation/web-design.md` (capas 5 a 7): paneles translúcidos sobre fondo claro, imágenes médicas siempre sobre el visor oscuro, solo Inter, acción en negro `#15191D` y sin color de acento; la única excepción es la señal de la animación de apertura de «El estudio», en miel `#E2B55E`. Sus tokens están en `web/src/style.css`; los colores de clase y la escala de realce son los de `style.py`.
 - Para cambiar el estilo se modifican `style.py` y esta sección; nunca se definen estilos sueltos dentro de un script o notebook.
 
 ## 9. Investigación

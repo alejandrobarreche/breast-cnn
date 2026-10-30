@@ -13,9 +13,8 @@ changed with respect to the reference experiment, the validation patient AUC of 
 (epoch chosen without the evaluated fold, or the last epoch for fixed-epoch runs, and the
 optimistic best epoch), the mean learning curves, and the cohort-only baseline. And writes
 web/src/results.json for the results charts: the nested run's out-of-fold validation patients
-and the test patients (label, raw and calibrated mean probability), the patient threshold, the
-earlier test evaluation of the previous final model (wide_crop128_fixed, after its threshold
-correction), and the per-fold history of the run whose curves fixed the number of epochs of the
+and the test patients (label, raw and calibrated mean probability), the patient threshold, and
+the per-fold history of the run whose curves fixed the number of epochs of the
 final model with the epoch each fold would take from the mean curve of the other folds.
 """
 
@@ -173,16 +172,8 @@ def _results(root: Path, analysis, calibration: dict) -> dict:
         r for r in load_runs(root / analysis.runs_dir) if r.experiment == EPOCH_REFERENCE
     )
     columns = ["train_loss", "validation_loss", "validation_patient_auc"]
-    earlier = json.loads((root / analysis.corrected_test_report_path).read_text("utf-8"))
     return {
         "threshold": calibration["threshold"],
-        # Test evaluation of the previous final model, with its post-test threshold correction
-        "earlier_test": {
-            "run": earlier["run"],
-            "auc": earlier["auc"],
-            "auc_difference": earlier["cohort_baseline"]["auc_difference"],
-            **{k: earlier["at_threshold"][k] for k in ("sensitivity", "specificity")},
-        },
         # [fold, label, raw, calibrated] per validation patient; [label, raw, calibrated] in test
         "validation": [
             [int(r.fold), int(r.label), float(r.probability), float(r.calibrated)]

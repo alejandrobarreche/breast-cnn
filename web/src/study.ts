@@ -34,7 +34,8 @@ function tile(source: HTMLCanvasElement, label: string, crop = false, zoom = fal
   const ctx = canvas.getContext("2d")!;
   if (zoom) ctx.drawImage(source, (source.width - CROP) / 2, (source.width - CROP) / 2, CROP, CROP, 0, 0, CROP, CROP);
   else ctx.drawImage(source, 0, 0);
-  box.append(canvas, make("span", "chip-label", label));
+  box.append(canvas);
+  if (label) box.append(make("span", "chip-label", label));
   if (crop) {
     const frame = make("div", "crop-frame");
     frame.style.inset = `${((1 - CROP / 256) / 2) * 100}%`;
@@ -76,10 +77,11 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
   heroCanvas.setAttribute("role", "img");
   heroCanvas.setAttribute("aria-label", "Animación: se adquiere la fase PRE de un corte de test, llega el contraste y se muestra el realce, se recorta la región central y la señal atraviesa las cinco etapas de la red hasta la probabilidad de pCR.");
   const openingText = make("div", "titular");
-  openingText.style.marginTop = "24px";
+  openingText.style.marginTop = "32px";
   openingText.append(
     make("h1", "page-title", "Estimación de la respuesta patológica completa a partir de una resonancia previa al tratamiento"),
-    make("p", "", "Una red convolucional 2D entrenada desde cero lee un corte de DCE-MRI en sus tres fases y estima la probabilidad de que la paciente alcance una respuesta patológica completa tras la quimioterapia."),
+    make("p", "", "La entrada es un corte de la resonancia de mama con contraste (DCE-MRI) en sus tres fases: antes, poco después y unos minutos después de inyectar el contraste. La salida es la probabilidad de que, tras la quimioterapia, el patólogo no encuentre tumor invasivo en el tejido operado: la respuesta patológica completa (pCR)."),
+    make("p", "", "Es una red convolucional 2D propia, entrenada desde cero: sin pesos preentrenados y sin datos clínicos, solo la imagen. Todos los cortes de una paciente están en el mismo lado de cada partición; las decisiones se toman con validación cruzada de cinco folds y el test solo interviene en la evaluación final."),
   );
   opening.append(viewerOf(heroCanvas), openingText);
   add(opening);
@@ -96,13 +98,14 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
     ],
   }).panel);
 
-  const dce = make("div", "visual-figure");
+  const dce = make("div", "pair");
   const phases = make("div", "tiles");
   phases.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
   phases.append(...["PRE", "EARLY", "LATE", "Realce"].map((name, k) => tile(views[k], name)));
   const curveTypes = svgOf("Esquema de las tres formas de la curva de captación: persistente, meseta y lavado");
   dce.append(viewerOf(phases, enhancementLegend()), curveTypes);
   add(visualBlock({
+    wide: true,
     title: "Qué muestra la DCE-MRI",
     context: exampleContext,
     figure: dce,
@@ -112,13 +115,6 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
       "Si en LATE la intensidad sigue subiendo, la curva es persistente; si apenas cambia, meseta; si baja, lavado (washout), un patrón frecuente en tumores malignos. A la red nadie le indica estos patrones.",
     ],
   }).panel);
-
-  add(titular({
-    title: "Una CNN 2D entrenada desde cero que estima la pCR a partir de un corte",
-    body: [
-      "Sin pesos preentrenados ni datos clínicos: la entrada es solo la imagen, en sus tres fases. La unidad estadística es la paciente, y sus cortes nunca se reparten entre entrenamiento y validación. Las decisiones se toman con validación cruzada de cinco folds; el test se reserva para la evaluación final.",
-    ],
-  }));
 
   /* ---------- 2. Data ---------- */
   add(head(1));
@@ -157,22 +153,23 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
   add(splitBlock.panel);
 
   const read = make("div", "tiles");
-  read.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
+  read.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+  read.style.gap = "24px";
   const steps = [
-    [tile(views[1], "PNG"), "Tres PNG de 8 bits, enteros 0–255"],
-    [tile(views[1], "÷ 255"), "float32 [3, 256, 256] en [0, 1]"],
-    [tile(views[1], "Recorte", true), `Región central de ${CROP} × ${CROP}`],
-    [tile(views[1], `${CROP} × ${CROP}`, false, true), `[3, ${CROP}, ${CROP}]: lo que ve la red`],
+    [tile(views[1], ""), "1. Corte del dataset", "Un PNG de 256 × 256 por fase; cada píxel es un entero de 0 a 255. Se divide entre 255 y las tres fases se apilan como canales: [3, 256, 256]."],
+    [tile(views[1], "", true), `2. Región central de ${CROP} × ${CROP}`, "El dataset ya centró cada corte en el tumor, así que el cuadrado central conserva la lesión y descarta tejido alejado."],
+    [tile(views[1], "", false, true), `3. Entrada de las convoluciones`, `[3, ${CROP}, ${CROP}]: la misma región, ampliada aquí para verla; es todo lo que ven las capas de la red.`],
   ] as const;
-  for (const [node, caption] of steps) {
-    const cell = make("div", "tool");
-    cell.style.gap = "8px";
-    cell.append(viewerOf(node), make("span", "context", caption));
+  for (const [node, name, text] of steps) {
+    const cell = make("div", "step");
+    const caption = make("p", "step-text");
+    caption.append(make("b", "", name), text);
+    cell.append(viewerOf(node), caption);
     read.append(cell);
   }
   add(visualBlock({
     title: "Preprocesado de un corte",
-    context: `${exampleContext} · fase EARLY`,
+    context: `${exampleContext} · fase EARLY, las otras dos siguen los mismos pasos`,
     figure: read,
     conclusion: "La red recibe las tres fases alineadas como canales, en escala value / 255 y sin normalización de color.",
     detail: [
@@ -191,7 +188,6 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
     const nodes: HTMLElement[] = [];
     ["PRE", "EARLY", "LATE"].forEach((name, k) => samples.forEach((a, j) => nodes.push(tile(augmentPhase(views[k], a), j ? "" : name))));
     grid.replaceChildren(...nodes);
-    for (const label of grid.querySelectorAll(".chip-label")) if (!label.textContent) label.remove();
   };
   another.addEventListener("click", drawAugment);
   augment.append(viewerOf(grid), another);
@@ -266,7 +262,7 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
     conclusion: `El mejor experimento obtiene ${decimal(best)}, ${decimal(gain, 2)} por encima de la referencia por cohorte` +
       (gain < maxSpread ? `; con desviaciones entre folds de hasta ${decimal(maxSpread, 2)}, los experimentos no se pueden ordenar con seguridad.` : "."),
     detail: [
-      `Cada fila es un entrenamiento completo con validación cruzada; los puntos pequeños son los cinco folds y el grande, su media. El modelo final, ${finalRun.name}, obtiene ${decimal(mean(finalRun.auc))} ± ${decimal(std(finalRun.auc))}.`,
+      `Cada fila es un entrenamiento completo con validación cruzada; los puntos pequeños son los cinco folds, el grande su media y la línea que los une, ± una desviación típica entre folds. La franja gris es la referencia por cohorte (media ± desviación) y la línea gris continua, su media. El modelo final, ${finalRun.name}, obtiene ${decimal(mean(finalRun.auc))} ± ${decimal(std(finalRun.auc))}.`,
       `Cada fold se lee en una época elegida sin mirarlo (la que maximiza la curva media de los otros cuatro) o en la última, si las épocas son fijas. Elegir la mejor época del propio fold usaría la validación para decidir y para medir.`,
     ],
   });
@@ -291,27 +287,18 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
 
   /* ---------- 5. Results ---------- */
   add(head(4));
-  const earlier = results.earlier_test;
-  add(titular({
-    id: "estudio-dos-evaluaciones",
-    title: "El test se evaluó dos veces",
-    body: [
-      `El primer modelo final, ${earlier.run.split("_").slice(1).join("_")}, obtuvo en test un AUC de ${decimal(earlier.auc.value)} (IC 95 % ${decimal(earlier.auc.lower)}–${decimal(earlier.auc.upper)}). Su umbral se corrigió después de esa evaluación.`,
-      `Después se sustituyó por ${finalRun.name}, elegido solo con la validación cruzada. Su evaluación es la segunda consulta del mismo test: no es del todo independiente y no sirve para elegir entre los dos modelos.`,
-    ],
-  }));
-
-  const aucSvg = svgOf("AUC por paciente en test de los dos modelos, con su intervalo de confianza, frente al azar y a la referencia por cohorte");
+  const aucSvg = svgOf("AUC por paciente en test del modelo final, con su intervalo de confianza, frente al azar y a la referencia por cohorte");
   const d = s.auc_difference;
   const chance = s.auc.lower <= 0.5, indistinct = d.lower <= 0;
   add(visualBlock({
     title: "AUC por paciente en test",
     context: `Test · por paciente · ${s.patients} pacientes, ${s.positives} pCR · IC 95 % por bootstrap`,
     figure: aucSvg,
-    conclusion: `El modelo actual obtiene ${decimal(s.auc.value)}` + (chance && indistinct ? `: no se distingue del azar ni de la referencia por cohorte (${decimal(s.cohort_baseline_auc)}).` : chance ? ": su intervalo incluye el azar." : indistinct ? `: no se distingue de la referencia por cohorte (${decimal(s.cohort_baseline_auc)}).` : "."),
+    conclusion: `El modelo obtiene ${decimal(s.auc.value)}` + (chance && indistinct ? `: no se distingue del azar ni de la referencia por cohorte (${decimal(s.cohort_baseline_auc)}).` : chance ? ": su intervalo incluye el azar." : indistinct ? `: no se distingue de la referencia por cohorte (${decimal(s.cohort_baseline_auc)}).` : "."),
     detail: [
       "El AUC es la probabilidad de que una paciente con pCR reciba una puntuación mayor que una sin pCR: 0,5 equivale al azar y 1 a separarlas sin error.",
-      `La referencia por cohorte puntúa a cada paciente con la proporción de pCR de su cohorte. Diferencia del modelo actual con ella: ${decimal(d.value)} (IC 95 % ${decimal(d.lower)} a ${decimal(d.upper)}).`,
+      `La referencia por cohorte puntúa a cada paciente con la proporción de pCR de su cohorte. Diferencia del modelo con ella: ${decimal(d.value)} (IC 95 % ${decimal(d.lower)} a ${decimal(d.upper)}).`,
+      "El test ya se había consultado antes con otro modelo candidato, así que esta cifra no es una estimación del todo independiente.",
     ],
   }).panel);
 
@@ -423,11 +410,9 @@ export function buildStudy(root: HTMLElement, index: HTMLElement, views: HTMLCan
   });
   drawEpochs(epochSvg, histories, ep.chosen, ep.out_of_fold_epochs);
   drawAuc(aucSvg, [
-    { label: "Modelo actual", value: s.auc.value, lower: s.auc.lower, upper: s.auc.upper, primary: true },
-    { label: "Modelo anterior", value: earlier.auc.value, lower: earlier.auc.lower, upper: earlier.auc.upper, primary: false },
+    { label: "Modelo final", value: s.auc.value, lower: s.auc.lower, upper: s.auc.upper, primary: true },
   ], s.cohort_baseline_auc, [
-    { label: "Modelo actual", value: d.value, lower: d.lower, upper: d.upper, primary: true },
-    { label: "Modelo anterior", ...earlier.auc_difference, primary: false },
+    { label: "Modelo final", value: d.value, lower: d.lower, upper: d.upper, primary: true },
   ]);
   drawRoc(rocSvg, foldRoc, testRoc, point, {
     test: `test · AUC ${decimal(testAuc)}`,

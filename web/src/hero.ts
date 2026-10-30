@@ -28,7 +28,7 @@ const LINKS = 5; // connections drawn between two columns
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ease = (u: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
 const BONE = "232, 228, 218";
-// Colour of the travelling signal: the accent of the page (CSS --signal)
+// Colour of the travelling signal: honey, used nowhere else on the page (CSS --signal)
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
 interface Column { x: number; cy: number; side: number; sheets: number; gap: number; width: number; label: string; kind: "input" | "stage" | "vector" | "output" }
@@ -57,12 +57,12 @@ export function startHero(canvas: HTMLCanvasElement, input: HeroInput) {
     img = { x: left, y: (H - s) / 2 - 12, s };
     const cy = img.y + s / 2;
 
-    // Sheet side ~ log2(spatial size); sheets per stack ~ log2(channels)
+    // Sheet side ~ log2(spatial size); sheets per stack ~ log2(channels), one for the narrowest stage
     const unit = Math.min(H * 0.5, s * 0.78);
     const side = (size: number) => unit * (0.16 + 0.84 * Math.log2(size / 8) / 4);
     const spec: Omit<Column, "x" | "width">[] = [
       { cy, side: side(input.crop), sheets: 3, gap: 9, label: `3 × ${input.crop}²`, kind: "input" },
-      ...input.stages.map((st) => ({ cy, side: side(st.size), sheets: 2 + 2 * Math.log2(st.channels / 16), gap: 4, label: `${st.channels} × ${st.size}²`, kind: "stage" as const })),
+      ...input.stages.map((st) => ({ cy, side: side(st.size), sheets: 1 + Math.log2(st.channels / input.stages[0].channels), gap: 4, label: `${st.channels} × ${st.size}²`, kind: "stage" as const })),
       { cy, side: unit * 0.34, sheets: 1, gap: 0, label: String(input.stages[input.stages.length - 1].channels), kind: "vector" },
       { cy, side: 16, sheets: 1, gap: 0, label: "P(pCR)", kind: "output" },
     ];

@@ -92,30 +92,31 @@
             </aside>
 
             <div class="stage">
-              <div class="stage-head">
-                <span><b id="study-name"></b> <span id="study-meta"></span></span>
+              <!-- Name, tools and the reading of the view sit beside the viewer, which keeps the full height -->
+              <div class="stage-side">
+                <div class="stage-head"><b id="study-name"></b> <span id="study-meta"></span></div>
+                <div class="tools" role="toolbar" aria-label="Herramientas del visor">
+                  <button class="tool-btn" id="tool-probe" aria-pressed="true">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v14M1 8h14" /></svg>Medir captación
+                  </button>
+                  <button class="tool-btn" id="tool-crop" aria-pressed="true">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" stroke-dasharray="2 2" /></svg>Recorte
+                  </button>
+                  <span class="tool-sep" aria-hidden="true"></span>
+                  <button class="tool-btn" id="tool-enhancement" aria-pressed="true">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor" /></svg>Realce
+                  </button>
+                  <button class="tool-btn" id="tool-occlusion" aria-pressed="false">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h4v4H2zM10 2h4v4h-4zM6 6h4v4H6zM2 10h4v4H2zM10 10h4v4h-4z" /></svg>Oclusión
+                  </button>
+                </div>
+                <div class="progress" id="occlusion-progress" hidden><span id="occlusion-status"></span><div class="bar-track"><i id="occlusion-bar"></i></div></div>
                 <span id="probe-context"></span>
+                <p class="detail" id="view-detail"></p>
               </div>
               <div class="viewer">
                 <div class="views" id="views" tabindex="0" aria-label="Fases PRE, EARLY y LATE y cuarta vista. Las flechas mueven el punto de medida."></div>
               </div>
-              <div class="tools" role="toolbar" aria-label="Herramientas del visor">
-                <button class="tool-btn" id="tool-probe" aria-pressed="true">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v14M1 8h14" /></svg>Medir captación
-                </button>
-                <button class="tool-btn" id="tool-crop" aria-pressed="true">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" stroke-dasharray="2 2" /></svg>Recorte
-                </button>
-                <span class="tool-sep" aria-hidden="true"></span>
-                <button class="tool-btn" id="tool-enhancement" aria-pressed="true">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor" /></svg>Realce
-                </button>
-                <button class="tool-btn" id="tool-occlusion" aria-pressed="false">
-                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h4v4H2zM10 2h4v4h-4zM6 6h4v4H6zM2 10h4v4H2zM10 10h4v4h-4z" /></svg>Oclusión
-                </button>
-              </div>
-              <div class="progress" id="occlusion-progress" hidden><span id="occlusion-status"></span><div class="bar-track"><i id="occlusion-bar"></i></div></div>
-              <p class="detail" id="view-detail"></p>
             </div>
 
             <aside class="report" aria-labelledby="report-label">
